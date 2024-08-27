@@ -19,6 +19,14 @@ Public Class Form1
     Dim mesenh3 As Integer = ConfigurationManager.AppSettings("mesenh3")
     Dim hiddenColumns As New List(Of String)()
     Dim d2 As Date
+    Enum State
+        ' List of enumerated state  
+        CaricamentoDati = 1
+        CaricamentoTabelle = 2
+        CaricamentoFogli = 3
+        Terminato = 4
+    End Enum
+    Dim actualState As Byte
 
 
     Private Sub Form1_Load(sender As Object, e As EventArgs) Handles MyBase.Load
@@ -27,6 +35,9 @@ Public Class Form1
         DateTimePicker1.Value = Date.Now.AddYears(-1)
         culture = System.Globalization.CultureInfo.CreateSpecificCulture("en-US")
         culture.NumberFormat.NumberGroupSeparator = ""
+        TextBox1.Visible = False
+        Button2.Enabled = False
+        Button3.Enabled = False
         SetDataGridView()
 
 
@@ -34,6 +45,7 @@ Public Class Form1
 
     Private Async Sub Button1_Click(sender As Object, e As EventArgs) Handles Button1.Click
 
+        Button1.Enabled = False
         reportType = ComboBox2.SelectedIndex
         section = 8
         Dim startDate As New DateTime(DateTimePicker1.Value.Year, 1, 1)
@@ -41,23 +53,55 @@ Public Class Form1
         ProgressBar1.Location = New Point(465, 501)
         ProgressBar1.Visible = True
         ProgressBar1.Maximum = 100
-        Dim progress As New Progress(Of Integer)(Sub(v)
-                                                     ProgressBar1.Value = v
-                                                 End Sub)
+        Dim barProgress As New Progress(Of Integer)(Sub(v)
+                                                        ProgressBar1.Value = v
+                                                    End Sub)
 
+        Dim StatusProgress As New Progress(Of Integer)(Sub(index)
+                                                           Select Case index
+                                                               Case 1
+                                                                   TextBox1.Text = "Caricamento Dati..."
+                                                                   actualState = State.CaricamentoDati
+                                                               Case 2
+                                                                   TextBox1.Text = "Caricamento Tabelle..."
+                                                                   actualState = State.CaricamentoTabelle
+                                                               Case 3
+                                                                   TextBox1.Text = "Caricamento Fogli..."
+                                                                   actualState = State.CaricamentoFogli
+                                                               Case 4
+                                                                   TextBox1.Text = "Terminato!"
+                                                                   actualState = State.Terminato
+                                                                   Button1.Enabled = True
+                                                           End Select
+                                                       End Sub)
         Dim dataTable1 As DataTable
         Dim dataTable2 As DataTable
-        dataTable1 = Await Task.Run(Function() GetData(progress, startDate, endDate, section, reportType, 1, dgv))
-        dataTable2 = Await Task.Run(Function() GetData(progress, startDate, endDate, section, reportType, 2, dgv2))
-        'ShowDataGridView(dataTable)
+        dataTable1 = Await Task.Run(Function() GetData(barProgress, startDate, endDate, section, reportType, 1, dgv))
+        dataTable2 = Await Task.Run(Function() GetData(barProgress, startDate, endDate, section, reportType, 2, dgv2))
         dgv.DataSource = dataTable1
         dgv2.DataSource = dataTable2
-        'Controls.Add(dgv)
         ProgressBar1.Visible = False
-        Button1.Enabled = False
-        Button2.Visible = True
-        Button3.Visible = True
+        TextBox1.Location = New Point(465, 501)
+        TextBox1.Visible = True
+        Await Task.Run(Sub() BarProgressTest(StatusProgress))
+
+        'Button2.Visible = True
+        'Button3.Visible = True
     End Sub
+
+    Private Async Sub BarProgressTest(ComboStatus As IProgress(Of Integer))
+
+        ComboStatus.Report(State.CaricamentoDati)
+        Await Task.Delay(5000)
+        ComboStatus.Report(State.CaricamentoFogli)
+        Await Task.Delay(5000)
+        ComboStatus.Report(State.CaricamentoTabelle)
+        Await Task.Delay(5000)
+        ComboStatus.Report(State.Terminato)
+
+
+    End Sub
+
 
     Private Function GetData(progress As IProgress(Of Integer), startTime As DateTime, endTime As DateTime, section As Int32, type As Int32, whatTable As Byte, dgv As DataGridView) As Data.DataTable
 
@@ -495,68 +539,6 @@ Public Class Form1
 
     End Sub
 
-    Private Sub Button2_Click_(sender As Object, e As EventArgs) Handles Button2.Click
-        Button2.Enabled = False
-        Button3.Enabled = False
-        Dim excel As New Microsoft.Office.Interop.Excel.Application
-        Dim wBook As Microsoft.Office.Interop.Excel.Workbook
-        Dim wSheet As Microsoft.Office.Interop.Excel.Worksheet
-        Dim startDate As New DateTime(DateTimePicker1.Value.Year, 1, 1)
-        Dim endDate As New DateTime(DateTimePicker2.Value.Year, 1, 1)
-        Dim templatePath As String
-        Dim exePath As String = Application.StartupPath
-        Dim rootPath As String = Directory.GetParent(Directory.GetParent(exePath).FullName).FullName
-        Dim reportTitle As String = ""
-
-
-
-        Select Case reportType
-            Case 0
-                reportTitle = "152_MASSICO_ANNO"
-                datanh3 = "01/01/2020"
-                d2 = New Date(2020, 1, 1)
-            Case 1
-                d2 = New Date(2020, mesenh3, 1)
-            Case 2
-                d2 = New Date(2020, mesenh3, 1)
-        End Select
-
-        'excel.DisplayAlerts = False
-        System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.CreateSpecificCulture("en-US")
-
-        If (startDate >= d2) Then
-            templatePath = Path.Combine(rootPath, "template", "E9_152_MESE_MASS_CAMINI.xls")
-        Else
-            templatePath = Path.Combine(rootPath, "template", "152_MESE_MASS_CAMINI.xls")
-
-        End If
-        wBook = excel.Workbooks.Open(templatePath)
-        wSheet = wBook.ActiveSheet()
-
-        Dim reportFileXls = reportTitle & ".xls"
-        Dim reportFilePdf = reportTitle & ".pdf"
-        Dim reportPath = Path.Combine(rootPath, "report", reportFileXls)
-        Dim reportPathPdf = Path.Combine(rootPath, "report", reportFilePdf)
-        'wBook.SaveAs(reportPath, Microsoft.Office.Interop.Excel.XlFileFormat.xlWorkbookNormal, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, Microsoft.Office.Interop.Excel.XlSaveAsAccessMode.xlNoChange)
-        '  wSheet.PageSetup.PrintArea = "A1:Z60"
-        wSheet.PageSetup.PaperSize = Microsoft.Office.Interop.Excel.XlPaperSize.xlPaperA4
-        wSheet.PageSetup.Orientation = Microsoft.Office.Interop.Excel.XlPageOrientation.xlLandscape
-        wSheet.ExportAsFixedFormat(Microsoft.Office.Interop.Excel.XlFixedFormatType.xlTypePDF, reportPathPdf, Quality:=Microsoft.Office.Interop.Excel.XlFixedFormatQuality.xlQualityStandard, _
-                    IncludeDocProperties:=True, IgnorePrintAreas:=False, _
-                    OpenAfterPublish:=False)
-        wBook.Close()
-        excel.Quit()
-
-        Marshal.ReleaseComObject(wSheet)
-        Marshal.ReleaseComObject(wBook)
-
-        Marshal.ReleaseComObject(excel)
-        wSheet = Nothing
-        wBook = Nothing
-        ' wSheet = DBNull.Value
-        excel = Nothing
-    End Sub
-
     Private Sub Button2_Click(sender As Object, e As EventArgs) Handles Button2.Click
 
         Button2.Enabled = False
@@ -642,307 +624,138 @@ Public Class Form1
         dgv2.Visible = True
         dgv2.Visible = False
         'riga grigia
-        For i = 0 To dgv.Rows.Count - 2  'Escluse righe VLE, superi, Max e Min
+        Dim stringa As String
+        stringa = If(startDate >= d2, "AQ", "AP")
+        Dim tabspacenota As Integer
+        Dim last As String
+        Dim last1 As Integer
+        Dim appRange As String
+
+        ' Inserisce righe per la prima tabella
+        For i = 0 To dgv.Rows.Count - 2
             wSheet.Rows(cc + i).Insert()
         Next
-        Dim stringa As String
-        If (startDate >= d2) Then
-            stringa = "AQ"
-        Else
-            stringa = "AP"
-        End If
-        'prima tabella (solo parte esterna e bordi, non inserisce i dati)
-        wSheet.Cells(i + 10, 2) = "Giorno"
+
+        ' Prima tabella (parte esterna e bordi, non inserisce dati)
+        wSheet.Cells(11, 2) = "Giorno"
+
         For i = 0 To dgv.Rows.Count - 1
-            ' Non è necessario selezionare esplicitamente la riga, quindi rimuoviamo dgv.SelectedIndex = i
-
-            ' Ottieni la riga corrente
             Dim currentRow As DataGridViewRow = dgv.Rows(i)
+            Dim rowIndex As Integer = i + 11
 
-            ' Calcola l'intervallo di celle da formattare
-            app = "B" & (i + 11).ToString() & ":" & stringa & (i + 11).ToString()
-            wSheet.Range(app).NumberFormat = "@"
-            wSheet.Range(app).BorderAround()
+            ' Formattazione della riga
+            appRange = "B" & rowIndex & ":" & stringa & rowIndex
+            With wSheet.Range(appRange)
+                .NumberFormat = "@"
+                .BorderAround()
+            End With
 
-            ' Itera attraverso le colonne della riga corrente
+            ' Iterazione colonne per la prima tabella
             For kk = 2 To quit
-                Dim cellValue As String
-                If currentRow.Cells(kk).Value IsNot Nothing Then
-                    cellValue = currentRow.Cells(kk).Value.ToString()
-                Else
-                    cellValue = String.Empty
-                End If
+                Dim cellValue As String = If(currentRow.Cells(kk).Value IsNot Nothing, currentRow.Cells(kk).Value.ToString(), String.Empty)
+
                 If String.IsNullOrEmpty(cellValue) OrElse cellValue = "&nbsp;" Then
-                    wSheet.Cells(i + 11, kk) = ""
+                    wSheet.Cells(rowIndex, kk) = ""
                 Else
-                    If i = 2 Then ' ORA
-                        ' Assumendo che la cella contenga un valore DateTime
+                    If i = 2 Then
+                        ' Se è la terza riga, formato ORA
                         Dim cellDateTime As DateTime
                         If DateTime.TryParse(cellValue, cellDateTime) Then
-                            wSheet.Cells(i + 11, kk) = cellDateTime.ToString("HH.mm")
+                            wSheet.Cells(rowIndex, kk) = cellDateTime.ToString("HH.mm")
                         Else
-                            wSheet.Cells(i + 11, kk) = cellValue
+                            wSheet.Cells(rowIndex, kk) = cellValue
                         End If
                     Else
-                        Dim nextCellValue As String = String.Empty
-                        If kk + 1 < currentRow.Cells.Count AndAlso currentRow.Cells(kk + 1).Value IsNot Nothing Then
-                            nextCellValue = currentRow.Cells(kk + 1).Value.ToString()
-                        End If
-
                         If startDate < d2 AndAlso kk >= 38 Then
-                            wSheet.Cells(i + 11, kk) = nextCellValue
+                            wSheet.Cells(rowIndex, kk) = currentRow.Cells(kk + 1).Value.ToString()
                         Else
-                            wSheet.Cells(i + 11, kk) = cellValue
+                            wSheet.Cells(rowIndex, kk) = cellValue
                         End If
                     End If
                 End If
             Next
         Next
 
-        tabspace = 11 + dgv.Rows.Count + 4 ' spazio tra le due tabelle
-        'per modificare le righe (quantità, prima erano 6) della seconda tabella(oer valide, ore n.f) modificare il GridView2.Rows.Count e gv_dailyrep.Rows.Count.(prima a +3 e -4)
+        tabspace = 11 + dgv.Rows.Count + 4
+        tabspacenota = 34 + dgv.Rows.Count + 4
 
+        ' Inserisce righe per la seconda tabella
         For i = dgv.Rows.Count To dgv2.Rows.Count + dgv.Rows.Count + 2
             wSheet.Rows(cc + i + 1).Insert()
         Next
-        'la tabella in basso
+
+        ' Crea e formatta la seconda tabella
         For i = 0 To dgv2.Rows.Count - 3
             Dim currentRow As DataGridViewRow = dgv2.Rows(i)
-            app = "B" & i + tabspace & ":" & stringa & i + tabspace
-            wSheet.Range(app).NumberFormat = "@"
-            wSheet.Range(app).BorderAround()
-            app = "C" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "D" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "E" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "F" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "G" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "H" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "I" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "J" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "K" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "L" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "M" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "N" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "O" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "P" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "Q" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "R" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "S" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "T" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "U" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "V" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "W" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "X" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "Y" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "Z" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "AA" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "AB" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "AC" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "AD" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "AE" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "AF" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            app = "AG" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "AH" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "AI" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "AJ" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "AK" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "AL" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "AM" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "AN" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "AO" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "AP" & i + tabspace
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            If (startDate >= d2) Then
-                app = "AQ" & i + tabspace
-                wSheet.Range(app).BorderAround()
-                wSheet.Range(app).HorizontalAlignment = -4108
-                wSheet.Range(app).VerticalAlignment = -4108
-            End If
+            Dim rowIndex As Integer = i + tabspace
 
+            ' Formattazione della riga
+            appRange = "B" & rowIndex & ":" & stringa & rowIndex
+            With wSheet.Range(appRange)
+                .NumberFormat = "@"
+                .BorderAround()
+            End With
 
-            'lunghezza tabella secondaria
+            ' Allineamento celle per colonne specifiche
+            Dim columns As String() = {"C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "AA", "AB", "AC", "AD", "AE", "AF", "AG", "AH", "AI", "AJ", "AK", "AL", "AM", "AN", "AO", "AP"}
+            If startDate >= d2 Then columns = columns.Concat({"AQ"}).ToArray()
+
+            For Each col In columns
+                With wSheet.Range(col & rowIndex.ToString())
+                    .BorderAround()
+                    .HorizontalAlignment = -4108
+                    .VerticalAlignment = -4108
+                End With
+            Next
+
+            ' Popolamento delle celle nella seconda tabella
             For kk = 2 To quit
-                Dim cellValue As String
-                If currentRow.Cells(kk).Value IsNot Nothing Then
-                    cellValue = currentRow.Cells(kk).Value.ToString()
-                Else
-                    cellValue = String.Empty
-                End If
+                Dim cellValue As String = If(currentRow.Cells(kk).Value IsNot Nothing, currentRow.Cells(kk).Value.ToString(), String.Empty)
 
                 If String.IsNullOrEmpty(cellValue) OrElse cellValue = "&nbsp;" Then
-                    wSheet.Cells(i + tabspace, kk) = ""
+                    wSheet.Cells(rowIndex, kk) = ""
                 Else
-                    If (startDate < d2 And kk >= 38) Then
-                        wSheet.Cells(i + tabspace, kk) = currentRow.Cells(kk + 1).Value.ToString()
+                    If startDate < d2 AndAlso kk >= 38 Then
+                        wSheet.Cells(rowIndex, kk) = currentRow.Cells(kk + 1).Value.ToString()
                     Else
-                        wSheet.Cells(i + tabspace, kk) = currentRow.Cells(kk).Value.ToString()
+                        wSheet.Cells(rowIndex, kk) = cellValue
                     End If
-
                 End If
             Next
         Next
 
-        Dim tabspacenota As Integer
-        ' codice aggiuntivo (tabella flussi di massa, specchietto riassuntivo TUTTI I CAMINI)
-        tabspace = 11 + dgv.Rows.Count + 4
-        'per scritta NH3 
-        tabspacenota = 34 + dgv.Rows.Count + 4
-        Dim last As String
-        Dim last1 As Integer
-        'specchietto visibile solo se l'aia 2018 e il report è annuale
-        If ((wSheet.Range("B8").Value = "Mese")) Then
-
-            'intestazionne inquinanti ton
-            'AG8 AL9
-            If (startDate >= d2) Then
-                '  wSheet.Range("B8:H9").Copy()
+        ' Specchietto riassuntivo, visibile solo se il report è annuale
+        If wSheet.Range("B8").Value = "Mese" Then
+            ' Intestazione inquinanti tonnellate
+            If startDate >= d2 Then
                 wSheet.Range("AG8:AL9").Copy()
                 last = "I"
                 last1 = 9
-
             Else
                 wSheet.Range("B8:G9").Copy()
                 last = "G"
                 last1 = 7
             End If
 
-            If (startDate >= d2) Then
+            If startDate >= d2 Then
                 wSheet.Range("C34").Select()
             Else
                 wSheet.Range("B34").Select()
             End If
             wSheet.Paste()
-            If (startDate >= d2) Then
+
+            If startDate >= d2 Then
                 wSheet.Range("B8:B9").Copy()
                 wSheet.Range("B34").Select()
                 wSheet.Paste()
                 wSheet.Range("H35").Value = "(¹) NH3(Ton)"
-                wSheet.Range("C" & tabspacenota).Value = "(¹) NH3: contributo del solo camino E9 (rif. prescrizione n. [43] del PIC Decreto AIA n.92/2018 ) "
-                wSheet.Range("C" & tabspacenota + 1).Value = " (²)NOX: contributi camini E1 + E2 + E4 + E7 +E8 + E9 (rif. prescrizione n. [28] del PIC Decreto AIA n.92/2018 ) "
+                wSheet.Range("C" & tabspacenota).Value = "(¹) NH3: contributo del solo camino E9 (rif. prescrizione n. [43] del PIC Decreto AIA n.92/2018 )"
+                wSheet.Range("C" & tabspacenota + 1).Value = "(²)NOX: contributi camini E1 + E2 + E4 + E7 +E8 + E9 (rif. prescrizione n. [28] del PIC Decreto AIA n.92/2018 )"
                 wSheet.Range("I35").Value = "(²) NOX(Ton) (RIF. BAT 57)"
             End If
 
             wSheet.Range("C34").Value = "E1+E2+E4+E7+E8+E9+E10"
-            If (startDate >= d2) Then
+            If startDate >= d2 Then
                 wSheet.Range("C35").Value = "NOX(Ton)"
                 wSheet.Range("D35").Value = "SO2(Ton) (RIF. BAT 58)"
             Else
@@ -950,45 +763,31 @@ Public Class Form1
                 wSheet.Range("D35").Value = "SO2(Ton)"
             End If
 
-
             wSheet.Range("E35").Value = "Polveri(Ton)"
             wSheet.Range("F35").Value = "CO(Ton)"
             wSheet.Range("G35").Value = "COV(Ton)"
 
-            ' wSheet.Range("C34:G35").Borders.Weight = "3"
-            '  For p ì 0 To gv?dailyrep.Rows.Count ' 1
-            'margini specchietto riassuntivo (mesi e somma annuale)
+            ' Margini specchietto riassuntivo (mesi e somma annuale)
             For p = 0 To dgv.Rows.Count - 1
-                ' Ottieni la riga corrente usando l'indice p
                 Dim currentRow As DataGridViewRow = dgv.Rows(p)
-
-                ' Calcola l'intervallo di celle da formattare
-                app = "B" & (p + 36).ToString() & ":" & last & (p + 36).ToString()
-                wSheet.Range(app).NumberFormat = "@"
-                wSheet.Range(app).BorderAround()
-                wSheet.Range(app).Borders.Weight = 2 ' Usa numeri per pesi dei bordi, non stringhe
-                app = "B" & (p + 36).ToString()
-
-                wSheet.Range(app).HorizontalAlignment = Microsoft.Office.Interop.Excel.Constants.xlCenter
+                appRange = "B" & (p + 36).ToString() & ":" & last & (p + 36).ToString()
+                With wSheet.Range(appRange)
+                    .NumberFormat = "@"
+                    .BorderAround()
+                    .Borders.Weight = 2
+                    .HorizontalAlignment = Microsoft.Office.Interop.Excel.Constants.xlCenter
+                End With
 
                 For kk = 2 To last1
-                    Dim cellValue As String = String.Empty
-
-                    ' Verifica se la cella è nulla o contiene un valore e assegnalo a cellValue
-                    If currentRow.Cells(kk).Value IsNot Nothing Then
-                        cellValue = currentRow.Cells(kk).Value.ToString()
-                    Else
-                        cellValue = String.Empty
-                    End If
+                    Dim cellValue As String = If(currentRow.Cells(kk).Value IsNot Nothing, currentRow.Cells(kk).Value.ToString(), String.Empty)
 
                     If String.IsNullOrEmpty(cellValue) OrElse cellValue = "&nbsp;" Then
                         wSheet.Cells(p + 36, kk) = ""
                     Else
-                        ' Copia il valore della cella alla riga successiva
+                        wSheet.Cells(p + 36, kk).Value = cellValue
                         wSheet.Cells(p + 36, kk).Copy()
                         wSheet.Cells(p + 37, kk).PasteSpecial()
 
-                        ' Imposta valori specifici
                         If startDate >= d2 Then
                             wSheet.Cells(p + 37, 3).Value = "N.A."
                         Else
@@ -1008,8 +807,6 @@ Public Class Form1
                         If kk = 2 Then ' ORA
                             wSheet.Cells(p + 36, kk).Value = String.Format("{0:HH.mm}", currentRow.Cells(kk).Value)
                             wSheet.Cells(p + 36, kk).Font.Bold = True
-                            wSheet.Cells(p + 36, kk).Copy()
-                            wSheet.Cells(p + 37, kk).PasteSpecial()
                             wSheet.Cells(p + 37, kk).Value = "VLE"
                         Else
                             wSheet.Cells(p + 36, kk).Value = String.Format("{0:0.00}", currentRow.Cells(kk + 41).Value)
@@ -1024,73 +821,74 @@ Public Class Form1
                     End If
                 Next
             Next
+        End If
 
-            For ep = 0 To dgv.Rows.Count - 1
-                ' Ottieni la riga corrente usando l'indice ep
-                Dim currentRow As DataGridViewRow = dgv.Rows(ep)
+        For ep = 0 To dgv.Rows.Count - 1
+            ' Ottieni la riga corrente usando l'indice ep
+            Dim currentRow As DataGridViewRow = dgv.Rows(ep)
 
-                ' Calcola l'intervallo di celle da formattare
-                app = "L" & (ep + 36).ToString() & ":Q" & (ep + 36).ToString()
-                wSheet.Range(app).NumberFormat = "@"
-                wSheet.Range(app).BorderAround()
-                wSheet.Range(app).Borders.Weight = 2 ' Usa numeri per pesi dei bordi, non stringhe
+            ' Calcola l'intervallo di celle da formattare
+            app = "L" & (ep + 36).ToString() & ":Q" & (ep + 36).ToString()
+            wSheet.Range(app).NumberFormat = "@"
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).Borders.Weight = 2 ' Usa numeri per pesi dei bordi, non stringhe
 
-                ' Copia e incolla le aree specifiche
-                wSheet.Range("B8:G9").Copy()
-                wSheet.Range("L34").PasteSpecial() ' Usa PasteSpecial per maggiore controllo
+            ' Copia e incolla le aree specifiche
+            wSheet.Range("B8:G9").Copy()
+            wSheet.Range("L34").PasteSpecial() ' Usa PasteSpecial per maggiore controllo
 
-                wSheet.Range("C35:G35").Copy()
-                wSheet.Range("M35").PasteSpecial()
+            wSheet.Range("C35:G35").Copy()
+            wSheet.Range("M35").PasteSpecial()
 
-                ' Imposta i valori specifici nelle celle
-                wSheet.Range("M34").Value = "CAMINO E3"
-                wSheet.Range("N35").Value = "SO2(Ton)"
-                wSheet.Range("Q35").Value = "COT(Ton)"
+            ' Imposta i valori specifici nelle celle
+            wSheet.Range("M34").Value = "CAMINO E3"
+            wSheet.Range("N35").Value = "SO2(Ton)"
+            wSheet.Range("Q35").Value = "COT(Ton)"
 
-                For kk = 12 To 17
-                    Dim cellValue As String = String.Empty
+            For kk = 12 To 17
+                Dim cellValue As String = String.Empty
 
-                    ' Verifica se la cella è nulla o contiene un valore e assegnalo a cellValue
-                    If currentRow.Cells(kk).Value IsNot Nothing Then
-                        cellValue = currentRow.Cells(kk).Value.ToString()
-                    End If
+                ' Verifica se la cella è nulla o contiene un valore e assegnalo a cellValue
+                If currentRow.Cells(kk).Value IsNot Nothing Then
+                    cellValue = currentRow.Cells(kk).Value.ToString()
+                End If
 
-                    If String.IsNullOrEmpty(cellValue) OrElse cellValue = "&nbsp;" Then
-                        wSheet.Cells(ep + 36, kk) = ""
-                    Else
-                        ' Copia il valore della cella alla riga successiva
+                If String.IsNullOrEmpty(cellValue) OrElse cellValue = "&nbsp;" Then
+                    wSheet.Cells(ep + 36, kk) = ""
+                Else
+                    ' Copia il valore della cella alla riga successiva
+                    wSheet.Cells(ep + 36, kk).Copy()
+                    wSheet.Cells(ep + 37, kk).PasteSpecial()
+
+                    ' Imposta valori specifici
+                    wSheet.Cells(ep + 37, 12).Value = "VLE"
+                    wSheet.Cells(ep + 37, 13).Value = 750
+                    wSheet.Cells(ep + 37, 14).Value = 400
+                    wSheet.Cells(ep + 37, 15).Value = 10
+                    wSheet.Cells(ep + 37, 16).Value = "N.A"
+                    wSheet.Cells(ep + 37, 17).Value = "N.A"
+
+                    ' Formattazione per la colonna ORA
+                    If kk = 12 Then ' ORA
+                        wSheet.Cells(ep + 36, kk).Value = String.Format("{0:HH.mm}", currentRow.Cells(2).Value)
+                        wSheet.Cells(ep + 36, kk).Font.Bold = True
                         wSheet.Cells(ep + 36, kk).Copy()
                         wSheet.Cells(ep + 37, kk).PasteSpecial()
+                    Else
+                        ' Mostra il numero con due cifre decimali
+                        wSheet.Cells(ep + 36, kk).Value = String.Format("{0:0.00}", (Convert.ToDouble(currentRow.Cells(kk).Value) / 1000))
 
-                        ' Imposta valori specifici
-                        wSheet.Cells(ep + 37, 12).Value = "VLE"
-                        wSheet.Cells(ep + 37, 13).Value = 750
-                        wSheet.Cells(ep + 37, 14).Value = 400
-                        wSheet.Cells(ep + 37, 15).Value = 10
-                        wSheet.Cells(ep + 37, 16).Value = "N.A"
-                        wSheet.Cells(ep + 37, 17).Value = "N.A"
-
-                        ' Formattazione per la colonna ORA
-                        If kk = 12 Then ' ORA
-                            wSheet.Cells(ep + 36, kk).Value = String.Format("{0:HH.mm}", currentRow.Cells(2).Value)
-                            wSheet.Cells(ep + 36, kk).Font.Bold = True
-                            wSheet.Cells(ep + 36, kk).Copy()
-                            wSheet.Cells(ep + 37, kk).PasteSpecial()
-                        Else
-                            ' Mostra il numero con due cifre decimali
-                            wSheet.Cells(ep + 36, kk).Value = String.Format("{0:0.00}", (Convert.ToDouble(currentRow.Cells(kk).Value) / 1000))
-
-                            ' Colore grigio per la riga somma annuale
-                            If ep = dgv.Rows.Count - 1 Then
-                                wSheet.Cells(ep + 36, 12).Interior.Color = Color.LightGray
-                                wSheet.Cells(ep + 36, kk).Interior.Color = Color.LightGray
-                                wSheet.Cells(ep + 37, kk).Font.Bold = True
-                            End If
+                        ' Colore grigio per la riga somma annuale
+                        If ep = dgv.Rows.Count - 1 Then
+                            wSheet.Cells(ep + 36, 12).Interior.Color = Color.LightGray
+                            wSheet.Cells(ep + 36, kk).Interior.Color = Color.LightGray
+                            wSheet.Cells(ep + 37, kk).Font.Bold = True
                         End If
                     End If
-                Next
+                End If
             Next
-        End If
+        Next
+
 
         Dim cellOffset As Integer = tabspace
         ' Dim stringa As String
@@ -1216,6 +1014,7 @@ Public Class Form1
         Dim reportFilePdf = reportTitle & ".pdf"
         Dim reportPath = Path.Combine(rootPath, "report", reportFileXls)
         Dim reportPathPdf = Path.Combine(rootPath, "report", reportFilePdf)
+        excel.DisplayAlerts = False
         wBook.SaveAs(reportPath, Microsoft.Office.Interop.Excel.XlFileFormat.xlWorkbookNormal, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, Microsoft.Office.Interop.Excel.XlSaveAsAccessMode.xlNoChange)
         wSheet.PageSetup.PrintArea = "A1:Z60"
         wSheet.PageSetup.PaperSize = Microsoft.Office.Interop.Excel.XlPaperSize.xlPaperA4
@@ -1224,6 +1023,7 @@ Public Class Form1
                     IncludeDocProperties:=True, IgnorePrintAreas:=False, _
                     OpenAfterPublish:=False)
         wBook.Close()
+        excel.DisplayAlerts = True
         excel.Quit()
 
         Marshal.ReleaseComObject(wSheet)
@@ -1232,7 +1032,6 @@ Public Class Form1
         Marshal.ReleaseComObject(excel)
         wSheet = Nothing
         wBook = Nothing
-        ' wSheet = DBNull.Value
         excel = Nothing
         MySharedMethod.KillAllExcels()
         System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.CreateSpecificCulture("it-IT")
@@ -1240,4 +1039,6 @@ Public Class Form1
         MsgBox("The Report(s) successfully downloaded. You can find the file(s) in the report directory")
 
     End Sub
+
+
 End Class
