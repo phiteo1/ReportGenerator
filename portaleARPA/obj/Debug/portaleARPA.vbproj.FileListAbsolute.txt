@@ -30,3 +30,4 @@ E:\GeneratoreReportTaranto\ReportGeneratorTaranto\portaleARPA\bin\Debug\portaleA
 E:\GeneratoreReportTaranto\ReportGeneratorTaranto\portaleARPA\obj\Debug\portaleARPA.Form1.resources
 E:\GeneratoreReportTaranto\ReportGeneratorTaranto\portaleARPA\obj\Debug\portaleARPA.Resources.resources
 E:\GeneratoreReportTaranto\ReportGeneratorTaranto\portaleARPA\obj\Debug\portaleARPA.vbproj.GenerateResource.Cache
+E:\GeneratoreReportTaranto\ReportGeneratorTaranto\portaleARPA\obj\Debug\portaleARPA.Form2.resources

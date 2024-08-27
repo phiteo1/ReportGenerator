@@ -71,7 +71,9 @@ Public Class Form1
                                                                Case 4
                                                                    TextBox1.Text = "Terminato!"
                                                                    actualState = State.Terminato
+                                                                   Button1.Text = "Genera Nuovamente"
                                                                    Button1.Enabled = True
+                                                                   Me.Hide()
                                                            End Select
                                                        End Sub)
         Dim dataTable1 As DataTable
@@ -80,28 +82,20 @@ Public Class Form1
         dataTable2 = Await Task.Run(Function() GetData(barProgress, startDate, endDate, section, reportType, 2, dgv2))
         dgv.DataSource = dataTable1
         dgv2.DataSource = dataTable2
+        Controls.Add(dgv)
+        Controls.Add(dgv2)
+        dgv.Visible = True
+        dgv.Visible = False
+        dgv2.Visible = True
+        dgv2.Visible = False
         ProgressBar1.Visible = False
         'TextBox1.Location = New Point(465, 501)
         TextBox1.Visible = True
-        Await Task.Run(Sub() BarProgressTest(StatusProgress))
-
+        Await Task.Run(Sub() downloadReport(StatusProgress))
+        Me.Show()
         'Button2.Visible = True
         'Button3.Visible = True
     End Sub
-
-    Private Async Sub BarProgressTest(ComboStatus As IProgress(Of Integer))
-
-        ComboStatus.Report(State.CaricamentoDati)
-        Await Task.Delay(5000)
-        ComboStatus.Report(State.CaricamentoFogli)
-        Await Task.Delay(5000)
-        ComboStatus.Report(State.CaricamentoTabelle)
-        Await Task.Delay(5000)
-        ComboStatus.Report(State.Terminato)
-
-
-    End Sub
-
 
     Private Function GetData(progress As IProgress(Of Integer), startTime As DateTime, endTime As DateTime, section As Int32, type As Int32, whatTable As Byte, dgv As DataGridView) As Data.DataTable
 
@@ -496,30 +490,6 @@ Public Class Form1
 
     End Sub
 
-
-    Private Sub SetDataGridView2()
-
-        dgv = New DataGridView()
-        dgv.Visible = False
-        dgv.Dock = DockStyle.Fill
-        dgv.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
-        dgv.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
-        dgv.AllowUserToAddRows = False
-        dgv.AllowUserToDeleteRows = False
-        dgv.AllowUserToResizeRows = False
-        dgv.RowHeadersVisible = False
-        dgv.Width = 1800
-        dgv.AutoGenerateColumns = True
-
-
-
-        For Each col As DataGridViewColumn In dgv.Columns
-            col.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter
-            col.DefaultCellStyle.Font = New Font(dgv.Font, FontStyle.Bold)
-        Next
-
-    End Sub
-
     Private Sub ShowDataGridView(dataTable As DataTable)
         ' Nascondi tutti i controlli del modulo eccetto la DataGridView
         For Each ctrl As Control In Controls
@@ -539,7 +509,7 @@ Public Class Form1
 
     End Sub
 
-    Private Sub Button2_Click(sender As Object, e As EventArgs)
+    Private Sub downloadReport(ComboStatus As IProgress(Of Integer))
 
         'Button2.Enabled = False
         'Button3.Enabled = False
@@ -585,6 +555,8 @@ Public Class Form1
         Dim tabspace As Integer
         cc = 11
 
+
+
         Select Case reportType
             Case 0
                 wSheet.Range("NomeTabella").Value = "152 MASSICO ANNUALE CAMINI DI RAFFINERIA"
@@ -616,13 +588,7 @@ Public Class Form1
         Else
             quit = 42
         End If
-        Controls.Add(dgv)
-        Controls.Add(dgv2)
 
-        dgv.Visible = True
-        dgv.Visible = False
-        dgv2.Visible = True
-        dgv2.Visible = False
         'riga grigia
         Dim stringa As String
         stringa = If(startDate >= d2, "AQ", "AP")
@@ -679,6 +645,8 @@ Public Class Form1
         tabspace = 11 + dgv.Rows.Count + 4
         tabspacenota = 34 + dgv.Rows.Count + 4
 
+
+
         ' Inserisce righe per la seconda tabella
         For i = dgv.Rows.Count To dgv2.Rows.Count + dgv.Rows.Count + 2
             wSheet.Rows(cc + i + 1).Insert()
@@ -724,6 +692,7 @@ Public Class Form1
             Next
         Next
 
+        ComboStatus.Report(State.CaricamentoTabelle)
         ' Specchietto riassuntivo, visibile solo se il report è annuale
         If wSheet.Range("B8").Value = "Mese" Then
             ' Intestazione inquinanti tonnellate
@@ -823,6 +792,7 @@ Public Class Form1
             Next
         End If
 
+        ComboStatus.Report(State.CaricamentoFogli)
         For ep = 0 To dgv.Rows.Count - 1
             ' Ottieni la riga corrente usando l'indice ep
             Dim currentRow As DataGridViewRow = dgv.Rows(ep)
@@ -1035,10 +1005,19 @@ Public Class Form1
         excel = Nothing
         MySharedMethod.KillAllExcels()
         System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.CreateSpecificCulture("it-IT")
-        Button1.Enabled = True
-        MsgBox("The Report(s) successfully downloaded. You can find the file(s) in the report directory")
+        ComboStatus.Report(State.Terminato)
+        ShowCompletionDialog()
+
 
     End Sub
 
 
+    Private Sub ShowCompletionDialog()
+        ' Crea un'istanza del form modale
+        Dim completedDownloadForm As New Form2()
+
+        ' Mostra il form in modalità modale
+        completedDownloadForm.ShowDialog()
+
+    End Sub
 End Class
