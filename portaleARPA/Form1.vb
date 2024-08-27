@@ -9,8 +9,8 @@ Public Class Form1
 
     Dim connectionString As String
     Dim culture As System.Globalization.CultureInfo
-    Dim reportType As Int32
-    Dim section As Int32
+    Dim reportType As Int32 = 255
+    Dim section As Int32 = 255
     Dim ret As Int32
     Dim ret2 As Int32
     Dim dgv As DataGridView
@@ -19,26 +19,27 @@ Public Class Form1
     Dim mesenh3 As Integer = ConfigurationManager.AppSettings("mesenh3")
     Dim hiddenColumns As New List(Of String)()
     Dim d2 As Date
-    Enum State
-        ' List of enumerated state  
-        CaricamentoDati = 1
-        CaricamentoTabelle = 2
+    Dim bolla As Byte = 255
+
+    Enum State                  'State Machine of the downloading process
+        DataLoading = 1
+        TableLoading = 2
         CaricamentoFogli = 3
-        ReportTerminato = 4
-        Terminato = 5
+        FinishedReport = 4
+        Finished = 5
     End Enum
+
     Dim actualState As Byte
 
 
-    Private Sub Form1_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+    Private Sub Form1_Load(sender As Object, e As EventArgs) Handles MyBase.Load                                'Inizialitation of the database connection, form's item and of the grid view 
 
         connectionString = ConfigurationManager.ConnectionStrings("GLOBAL_CONN_STR").ConnectionString
+        ComboBox1.SelectedIndex = 0
+        ComboBox2.SelectedIndex = 0
         DateTimePicker1.Value = Date.Now.AddYears(-1)
         culture = System.Globalization.CultureInfo.CreateSpecificCulture("en-US")
         culture.NumberFormat.NumberGroupSeparator = ""
-        TextBox1.Visible = False
-        'Button2.Enabled = False
-        'Button3.Enabled = False
         SetDataGridView()
 
 
@@ -48,34 +49,36 @@ Public Class Form1
 
         Button1.Enabled = False
         reportType = ComboBox2.SelectedIndex
-        section = 8
+        section = GetSection(ComboBox1.SelectedItem)
         Dim startDate As New DateTime(DateTimePicker1.Value.Year, 1, 1)
         Dim endDate As New DateTime(DateTimePicker2.Value.Year, 1, 1)
-        'ProgressBar1.Location = New Point(465, 501)
         ProgressBar1.Visible = True
         ProgressBar1.Maximum = 100
+
+        'Refresh the GUI when a change in the progress bar occours
         Dim barProgress As New Progress(Of Integer)(Sub(v)
                                                         ProgressBar1.Value = v
                                                     End Sub)
 
+        'Refresh the GUI when a change in the state occours
         Dim StatusProgress As New Progress(Of Integer)(Sub(index)
                                                            Select Case index
                                                                Case 1
-                                                                   TextBox1.Text = "Caricamento Dati..."
-                                                                   actualState = State.CaricamentoDati
+                                                                   TextBox1.Text = "Data Loading..."
+                                                                   actualState = State.DataLoading
                                                                Case 2
-                                                                   TextBox1.Text = "Caricamento Tabelle..."
-                                                                   actualState = State.CaricamentoTabelle
+                                                                   TextBox1.Text = "Table Creation..."
+                                                                   actualState = State.TableLoading
                                                                Case 3
-                                                                   TextBox1.Text = "Caricamento Fogli..."
+                                                                   TextBox1.Text = "Sheet Creation..."
                                                                    actualState = State.CaricamentoFogli
                                                                Case 4
-                                                                   TextBox1.Text = "Terminato report anno " & startDate.Year.ToString
-                                                                   actualState = State.CaricamentoFogli
+                                                                   TextBox1.Text = "Report  for the year " & startDate.Year.ToString & " downloaded succesfully"
+                                                                   actualState = State.FinishedReport
                                                                Case 5
-                                                                   TextBox1.Text = "Terminato!"
-                                                                   actualState = State.Terminato
-                                                                   Button1.Text = "Genera Nuovamente"
+                                                                   TextBox1.Text = "Report generation finished!"
+                                                                   actualState = State.Finished
+                                                                   Button1.Text = "Generate Again"
                                                                    Button1.Enabled = True
                                                                    Me.Hide()
                                                            End Select
@@ -90,34 +93,65 @@ Public Class Form1
             If (Not ProgressBar1.Visible) Then
                 ProgressBar1.Visible = True
             End If
-            dataTable1 = Await Task.Run(Function() GetData(barProgress, startDate, endDate, section, reportType, 1, dgv))
-            dataTable2 = Await Task.Run(Function() GetData(barProgress, startDate, endDate, section, reportType, 2, dgv2))
-            dgv.DataSource = dataTable1
-            dgv2.DataSource = dataTable2
+            dataTable1 = Await Task.Run(Function() GetData(barProgress, startDate, endDate, section, reportType, 1, dgv))   'Get the data from the database and assign to first data table structure. The function is runned in an other trhead in order to allow the GUI to refresh properly
+            dataTable2 = Await Task.Run(Function() GetData(barProgress, startDate, endDate, section, reportType, 2, dgv2))  'Get the data from the database and assign to second data table structure
+            dgv.DataSource = dataTable1                                                                                     'Bind the data to the first DataGridView
+            dgv2.DataSource = dataTable2                                                                                    'Bind the data to the second DataGridView
             dgv.Visible = True
-            dgv.Visible = False
+            dgv.Visible = False                                                                                             'Dont' worry about that. It's an hack to get the correct number of rows
             dgv2.Visible = True
             dgv2.Visible = False
             ProgressBar1.Visible = False
             TextBox1.Visible = True
-            Await Task.Run(Sub() downloadReport(StatusProgress, startDate, endDate))
+            Await Task.Run(Sub() downloadReport(StatusProgress, startDate, endDate))                                        'Download the reports of the selected years. The function is runned in an other trhead in order to allow the GUI to refresh properly 
             Dim deltaTime As String
             If (reportType = 0) Then
-                deltaTime = "yyyy"
+                deltaTime = "yyyy"                                                                                          'Add one year or one month according to the report type choosed
             Else
                 deltaTime = "m"
 
             End If
             startDate = DateAdd(deltaTime, 1, startDate)
         End While
-       
 
-        'TextBox1.Location = New Point(465, 501)
-        
         Me.Show()
-        'Button2.Visible = True
-        'Button3.Visible = True
+
     End Sub
+
+    Private Function GetSection(camino As String) As Int32
+
+        Select Case camino
+
+            Case "Camino E1"
+                Return 1
+            Case "Camino E2"
+                Return 2
+            Case "Camino E3"
+                Return 8
+            Case "Camino E4"
+                Return 3
+            Case "Camino E7"
+                Return 4
+            Case "Camino E8"
+                Return 5
+            Case "Camino E9"
+                Return 6
+            Case "Camino E10"
+                Return 7
+            Case "Camino E1"
+                Return 1
+            Case "Flussi di massa"
+                bolla = 0
+                Return 8
+            Case "Bolla di raffineria"
+                bolla = 1
+                Return 8
+            Case Else
+                Return 255
+
+        End Select
+
+    End Function
 
     Private Function GetData(progress As IProgress(Of Integer), startTime As DateTime, endTime As DateTime, section As Int32, type As Int32, whatTable As Byte, dgv As DataGridView) As Data.DataTable
 
@@ -712,7 +746,7 @@ Public Class Form1
             Next
         Next
 
-        ComboStatus.Report(State.CaricamentoTabelle)
+        ComboStatus.Report(State.TableLoading)
         ' Specchietto riassuntivo, visibile solo se il report è annuale
         If wSheet.Range("B8").Value = "Mese" Then
             ' Intestazione inquinanti tonnellate
@@ -1012,7 +1046,7 @@ Public Class Form1
         wSheet.ExportAsFixedFormat(Microsoft.Office.Interop.Excel.XlFixedFormatType.xlTypePDF, reportPathPdf, Quality:=Microsoft.Office.Interop.Excel.XlFixedFormatQuality.xlQualityStandard, _
                     IncludeDocProperties:=True, IgnorePrintAreas:=False, _
                     OpenAfterPublish:=False)
-        ComboStatus.Report(State.ReportTerminato)
+        ComboStatus.Report(State.FinishedReport)
         If (startDate = endDate) Then
             wBook.Close()
             excel.DisplayAlerts = True
@@ -1027,7 +1061,7 @@ Public Class Form1
             excel = Nothing
             MySharedMethod.KillAllExcels()
             System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.CreateSpecificCulture("it-IT")
-            ComboStatus.Report(State.Terminato)
+            ComboStatus.Report(State.Finished)
             ShowCompletionDialog()
         End If
 

@@ -54,7 +54,7 @@ Partial Class Form2
         Me.Controls.Add(Me.Button1)
         Me.Controls.Add(Me.Label2)
         Me.Name = "Form2"
-        Me.Text = "Form2"
+        Me.Text = "Report Generator"
         Me.ResumeLayout(False)
         Me.PerformLayout()
 

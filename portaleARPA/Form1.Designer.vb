@@ -45,9 +45,9 @@ Partial Class Form1
         Me.Label1.Font = New System.Drawing.Font("Segoe UI", 24.0!, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
         Me.Label1.Location = New System.Drawing.Point(184, 22)
         Me.Label1.Name = "Label1"
-        Me.Label1.Size = New System.Drawing.Size(332, 45)
+        Me.Label1.Size = New System.Drawing.Size(316, 45)
         Me.Label1.TabIndex = 0
-        Me.Label1.Text = "GENERATORE REPORT"
+        Me.Label1.Text = "REPORT GENERATOR"
         Me.Label1.TextAlign = System.Drawing.ContentAlignment.MiddleCenter
         '
         'ComboBox1
@@ -55,12 +55,11 @@ Partial Class Form1
         Me.ComboBox1.Cursor = System.Windows.Forms.Cursors.Arrow
         Me.ComboBox1.Font = New System.Drawing.Font("Segoe UI", 8.25!, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
         Me.ComboBox1.FormattingEnabled = True
-        Me.ComboBox1.Items.AddRange(New Object() {"Camino 1", "Camino 2", "Camino 3", "Camino 4"})
+        Me.ComboBox1.Items.AddRange(New Object() {"Camino E1", "Camino E2", "Camino E3", "Camino E4", "Camino E7", "Camino E8", "Camino E9", "Camino E10", "Flussi di massa", "Bolla di raffineria", "Stabilimento GPL"})
         Me.ComboBox1.Location = New System.Drawing.Point(90, 200)
         Me.ComboBox1.Name = "ComboBox1"
         Me.ComboBox1.Size = New System.Drawing.Size(222, 21)
         Me.ComboBox1.TabIndex = 1
-        Me.ComboBox1.Text = "Camino 1"
         '
         'Label2
         '
@@ -80,7 +79,6 @@ Partial Class Form1
         Me.ComboBox2.Name = "ComboBox2"
         Me.ComboBox2.Size = New System.Drawing.Size(223, 21)
         Me.ComboBox2.TabIndex = 3
-        Me.ComboBox2.Text = "Annuale"
         '
         'Label3
         '
@@ -118,7 +116,7 @@ Partial Class Form1
         Me.Button1.Name = "Button1"
         Me.Button1.Size = New System.Drawing.Size(302, 73)
         Me.Button1.TabIndex = 9
-        Me.Button1.Text = "Genera Report"
+        Me.Button1.Text = "Generate Report"
         Me.Button1.UseVisualStyleBackColor = True
         '
         'ProgressBar1
@@ -175,7 +173,7 @@ Partial Class Form1
         Me.Controls.Add(Me.ComboBox1)
         Me.Controls.Add(Me.Label1)
         Me.Name = "Form1"
-        Me.Text = "Form1"
+        Me.Text = "Report Generator"
         Me.ResumeLayout(False)
         Me.PerformLayout()
 
