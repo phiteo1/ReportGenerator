@@ -36,8 +36,8 @@ Public Class Form1
         culture = System.Globalization.CultureInfo.CreateSpecificCulture("en-US")
         culture.NumberFormat.NumberGroupSeparator = ""
         TextBox1.Visible = False
-        Button2.Enabled = False
-        Button3.Enabled = False
+        'Button2.Enabled = False
+        'Button3.Enabled = False
         SetDataGridView()
 
 
@@ -50,7 +50,7 @@ Public Class Form1
         section = 8
         Dim startDate As New DateTime(DateTimePicker1.Value.Year, 1, 1)
         Dim endDate As New DateTime(DateTimePicker2.Value.Year, 1, 1)
-        ProgressBar1.Location = New Point(465, 501)
+        'ProgressBar1.Location = New Point(465, 501)
         ProgressBar1.Visible = True
         ProgressBar1.Maximum = 100
         Dim barProgress As New Progress(Of Integer)(Sub(v)
@@ -81,7 +81,7 @@ Public Class Form1
         dgv.DataSource = dataTable1
         dgv2.DataSource = dataTable2
         ProgressBar1.Visible = False
-        TextBox1.Location = New Point(465, 501)
+        'TextBox1.Location = New Point(465, 501)
         TextBox1.Visible = True
         Await Task.Run(Sub() BarProgressTest(StatusProgress))
 
@@ -539,10 +539,10 @@ Public Class Form1
 
     End Sub
 
-    Private Sub Button2_Click(sender As Object, e As EventArgs) Handles Button2.Click
+    Private Sub Button2_Click(sender As Object, e As EventArgs)
 
-        Button2.Enabled = False
-        Button3.Enabled = False
+        'Button2.Enabled = False
+        'Button3.Enabled = False
         Dim excel As New Microsoft.Office.Interop.Excel.Application
         Dim wBook As Microsoft.Office.Interop.Excel.Workbook
         Dim wSheet As Microsoft.Office.Interop.Excel.Worksheet
