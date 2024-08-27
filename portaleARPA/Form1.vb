@@ -24,7 +24,8 @@ Public Class Form1
         CaricamentoDati = 1
         CaricamentoTabelle = 2
         CaricamentoFogli = 3
-        Terminato = 4
+        ReportTerminato = 4
+        Terminato = 5
     End Enum
     Dim actualState As Byte
 
@@ -69,6 +70,9 @@ Public Class Form1
                                                                    TextBox1.Text = "Caricamento Fogli..."
                                                                    actualState = State.CaricamentoFogli
                                                                Case 4
+                                                                   TextBox1.Text = "Terminato report anno " & startDate.Year.ToString
+                                                                   actualState = State.CaricamentoFogli
+                                                               Case 5
                                                                    TextBox1.Text = "Terminato!"
                                                                    actualState = State.Terminato
                                                                    Button1.Text = "Genera Nuovamente"
@@ -78,20 +82,38 @@ Public Class Form1
                                                        End Sub)
         Dim dataTable1 As DataTable
         Dim dataTable2 As DataTable
-        dataTable1 = Await Task.Run(Function() GetData(barProgress, startDate, endDate, section, reportType, 1, dgv))
-        dataTable2 = Await Task.Run(Function() GetData(barProgress, startDate, endDate, section, reportType, 2, dgv2))
-        dgv.DataSource = dataTable1
-        dgv2.DataSource = dataTable2
         Controls.Add(dgv)
         Controls.Add(dgv2)
-        dgv.Visible = True
-        dgv.Visible = False
-        dgv2.Visible = True
-        dgv2.Visible = False
-        ProgressBar1.Visible = False
+
+        While (startDate <= endDate)
+            ProgressBar1.Value = 0
+            If (Not ProgressBar1.Visible) Then
+                ProgressBar1.Visible = True
+            End If
+            dataTable1 = Await Task.Run(Function() GetData(barProgress, startDate, endDate, section, reportType, 1, dgv))
+            dataTable2 = Await Task.Run(Function() GetData(barProgress, startDate, endDate, section, reportType, 2, dgv2))
+            dgv.DataSource = dataTable1
+            dgv2.DataSource = dataTable2
+            dgv.Visible = True
+            dgv.Visible = False
+            dgv2.Visible = True
+            dgv2.Visible = False
+            ProgressBar1.Visible = False
+            TextBox1.Visible = True
+            Await Task.Run(Sub() downloadReport(StatusProgress, startDate, endDate))
+            Dim deltaTime As String
+            If (reportType = 0) Then
+                deltaTime = "yyyy"
+            Else
+                deltaTime = "m"
+
+            End If
+            startDate = DateAdd(deltaTime, 1, startDate)
+        End While
+       
+
         'TextBox1.Location = New Point(465, 501)
-        TextBox1.Visible = True
-        Await Task.Run(Sub() downloadReport(StatusProgress))
+        
         Me.Show()
         'Button2.Visible = True
         'Button3.Visible = True
@@ -393,14 +415,14 @@ Public Class Form1
         connection.Close()
         connection2.Close()
 
-        'If whatTable = 2 Then
-        '    connection2.Open()
-        '    logStatement = "DELETE FROM ARPA_WEB_MASSICI_CAMINI"
-        '    Using deleteCmd As New SqlCommand(logStatement, connection2)
-        '        deleteCmd.ExecuteNonQuery()
-        '    End Using
-        '    connection2.Close()
-        'End If
+        If whatTable = 2 Then
+            connection2.Open()
+            logStatement = "DELETE FROM ARPA_WEB_MASSICI_CAMINI"
+            Using deleteCmd As New SqlCommand(logStatement, connection2)
+                deleteCmd.ExecuteNonQuery()
+            End Using
+            connection2.Close()
+        End If
 
         Return dt
     End Function
@@ -509,15 +531,13 @@ Public Class Form1
 
     End Sub
 
-    Private Sub downloadReport(ComboStatus As IProgress(Of Integer))
+    Private Sub downloadReport(ComboStatus As IProgress(Of Integer), startDate As Date, endDate As Date)
 
         'Button2.Enabled = False
         'Button3.Enabled = False
         Dim excel As New Microsoft.Office.Interop.Excel.Application
         Dim wBook As Microsoft.Office.Interop.Excel.Workbook
         Dim wSheet As Microsoft.Office.Interop.Excel.Worksheet
-        Dim startDate As New DateTime(DateTimePicker1.Value.Year, 1, 1)
-        Dim endDate As New DateTime(DateTimePicker2.Value.Year, 1, 1)
         Dim templatePath As String
         Dim exePath As String = Application.StartupPath
         Dim rootPath As String = Directory.GetParent(Directory.GetParent(exePath).FullName).FullName
@@ -527,7 +547,7 @@ Public Class Form1
 
         Select Case reportType
             Case 0
-                reportTitle = "152_MASSICO_ANNO"
+                reportTitle = "152_MASSICO_ANNO_" & startDate.Year.ToString()
                 datanh3 = "01/01/2020"
                 d2 = New Date(2020, 1, 1)
             Case 1
@@ -992,21 +1012,25 @@ Public Class Form1
         wSheet.ExportAsFixedFormat(Microsoft.Office.Interop.Excel.XlFixedFormatType.xlTypePDF, reportPathPdf, Quality:=Microsoft.Office.Interop.Excel.XlFixedFormatQuality.xlQualityStandard, _
                     IncludeDocProperties:=True, IgnorePrintAreas:=False, _
                     OpenAfterPublish:=False)
-        wBook.Close()
-        excel.DisplayAlerts = True
-        excel.Quit()
+        ComboStatus.Report(State.ReportTerminato)
+        If (startDate = endDate) Then
+            wBook.Close()
+            excel.DisplayAlerts = True
+            excel.Quit()
 
-        Marshal.ReleaseComObject(wSheet)
-        Marshal.ReleaseComObject(wBook)
+            Marshal.ReleaseComObject(wSheet)
+            Marshal.ReleaseComObject(wBook)
 
-        Marshal.ReleaseComObject(excel)
-        wSheet = Nothing
-        wBook = Nothing
-        excel = Nothing
-        MySharedMethod.KillAllExcels()
-        System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.CreateSpecificCulture("it-IT")
-        ComboStatus.Report(State.Terminato)
-        ShowCompletionDialog()
+            Marshal.ReleaseComObject(excel)
+            wSheet = Nothing
+            wBook = Nothing
+            excel = Nothing
+            MySharedMethod.KillAllExcels()
+            System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.CreateSpecificCulture("it-IT")
+            ComboStatus.Report(State.Terminato)
+            ShowCompletionDialog()
+        End If
+
 
 
     End Sub
