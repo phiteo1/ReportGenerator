@@ -14,6 +14,7 @@ Public Class Form1
     Dim ret As Int32
     Dim ret2 As Int32
     Dim dgv As DataGridView
+    Dim dgv2 As DataGridView
     Dim datanh3 As String = ConfigurationManager.AppSettings("datanh3")
     Dim mesenh3 As Integer = ConfigurationManager.AppSettings("mesenh3")
     Dim hiddenColumns As New List(Of String)()
@@ -44,10 +45,13 @@ Public Class Form1
                                                      ProgressBar1.Value = v
                                                  End Sub)
 
-        Dim dataTable As DataTable
-        dataTable = Await Task.Run(Function() GetData(progress, startDate, endDate, section, reportType))
+        Dim dataTable1 As DataTable
+        Dim dataTable2 As DataTable
+        dataTable1 = Await Task.Run(Function() GetData(progress, startDate, endDate, section, reportType, 1, dgv))
+        dataTable2 = Await Task.Run(Function() GetData(progress, startDate, endDate, section, reportType, 2, dgv2))
         'ShowDataGridView(dataTable)
-        dgv.DataSource = dataTable
+        dgv.DataSource = dataTable1
+        dgv2.DataSource = dataTable2
         'Controls.Add(dgv)
         ProgressBar1.Visible = False
         Button1.Enabled = False
@@ -55,7 +59,7 @@ Public Class Form1
         Button3.Visible = True
     End Sub
 
-    Private Function GetData(progress As IProgress(Of Integer), startTime As DateTime, endTime As DateTime, section As Int32, type As Int32) As Data.DataTable
+    Private Function GetData(progress As IProgress(Of Integer), startTime As DateTime, endTime As DateTime, section As Int32, type As Int32, whatTable As Byte, dgv As DataGridView) As Data.DataTable
 
         Dim dt As New Data.DataTable()
         Dim command As System.Data.SqlClient.SqlCommand
@@ -66,6 +70,8 @@ Public Class Form1
         Dim queryNumber As Integer = 0
         Dim queriesCount As Integer = 4
         Dim progressStep As Integer = 100 \ queriesCount
+        Dim dataType As String = " AND TIPO_DATO IS NOT NULL ORDER BY INS_ORDER"
+
 
         Try
             ' Tenta di aprire la connessione
@@ -76,6 +82,11 @@ Public Class Form1
             MessageBox.Show("Errore durante la connessione al database: " & ex.Message, "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
             Return dt
         End Try
+
+        Select Case reportType
+            Case 0
+                datanh3 = "01/01/2020"
+        End Select
 
         dt.Columns.Add(New Data.DataColumn("IDX_REPORT", GetType(Double)))
         dt.Columns.Add(New Data.DataColumn("INS_ORDER", GetType(Integer)))
@@ -130,54 +141,54 @@ Public Class Form1
         dt.Columns.Add(New Data.DataColumn("E10Q_POLVERI", GetType(String)))
         dt.Columns.Add(New Data.DataColumn("E10Q_CO", GetType(String)))
         dt.Columns.Add(New Data.DataColumn("E10Q_COV", GetType(String)))
-        dt.Columns.Add(New Data.DataColumn("NOX_SOMMA", GetType(String)))
-        dt.Columns.Add(New Data.DataColumn("SO2_SOMMA", GetType(String)))
-        dt.Columns.Add(New Data.DataColumn("POLVERI_SOMMA", GetType(String)))
+        If whatTable = 1 Then
+            dt.Columns.Add(New Data.DataColumn("NOX_SOMMA", GetType(String)))
+            dt.Columns.Add(New Data.DataColumn("SO2_SOMMA", GetType(String)))
+            dt.Columns.Add(New Data.DataColumn("POLVERI_SOMMA", GetType(String)))
 
 
-        dt.Columns.Add(New Data.DataColumn("CO_SOMMA", GetType(String)))
+            dt.Columns.Add(New Data.DataColumn("CO_SOMMA", GetType(String)))
 
 
-        dt.Columns.Add(New Data.DataColumn("COV_SOMMA", GetType(String)))
-        dt.Columns.Add(New Data.DataColumn("NH3_SOMMA", GetType(String)))
+            dt.Columns.Add(New Data.DataColumn("COV_SOMMA", GetType(String)))
+            dt.Columns.Add(New Data.DataColumn("NH3_SOMMA", GetType(String)))
 
-        dt.Columns.Add(New Data.DataColumn("NOX57_SOMMA", GetType(String)))
+            dt.Columns.Add(New Data.DataColumn("NOX57_SOMMA", GetType(String)))
+            Dim testCMD As Data.SqlClient.SqlCommand = New Data.SqlClient.SqlCommand("sp_AQMSNT_FILL_ARPA_MASSICI_CAMINI_NODELETE", connection)
+            testCMD.CommandTimeout = 18000
+            testCMD.CommandType = Data.CommandType.StoredProcedure
+            testCMD.Parameters.Add("@idsez", Data.SqlDbType.Int, 11)
+            testCMD.Parameters("@idsez").Direction = Data.ParameterDirection.Input
+            testCMD.Parameters("@idsez").Value = section
+            testCMD.Parameters.Add("@data", Data.SqlDbType.DateTime, 11)
+            testCMD.Parameters("@data").Direction = Data.ParameterDirection.Input
+            testCMD.Parameters("@data").Value = startTime
+            testCMD.Parameters.Add("@TIPO_ESTRAZIONE", Data.SqlDbType.Int, 11)
+            testCMD.Parameters("@TIPO_ESTRAZIONE").Direction = Data.ParameterDirection.Input
+            testCMD.Parameters("@TIPO_ESTRAZIONE").Value = reportType
+            testCMD.Parameters.Add("@retval", Data.SqlDbType.Int)
+            testCMD.Parameters("@retval").Direction = Data.ParameterDirection.Output
 
-        Select Case reportType
-            Case 0
-                datanh3 = "01/01/2020"
-        End Select
+            testCMD.ExecuteScalar()
+            ret = testCMD.Parameters("@retval").Value
+            queryNumber += 3
+            progress.Report(queryNumber * progressStep)
 
-        Dim testCMD As Data.SqlClient.SqlCommand = New Data.SqlClient.SqlCommand("sp_AQMSNT_FILL_ARPA_MASSICI_CAMINI_NODELETE", connection)
-        testCMD.CommandTimeout = 18000
-        testCMD.CommandType = Data.CommandType.StoredProcedure
-        testCMD.Parameters.Add("@idsez", Data.SqlDbType.Int, 11)
-        testCMD.Parameters("@idsez").Direction = Data.ParameterDirection.Input
-        testCMD.Parameters("@idsez").Value = section
-        testCMD.Parameters.Add("@data", Data.SqlDbType.DateTime, 11)
-        testCMD.Parameters("@data").Direction = Data.ParameterDirection.Input
-        testCMD.Parameters("@data").Value = startTime
-        testCMD.Parameters.Add("@TIPO_ESTRAZIONE", Data.SqlDbType.Int, 11)
-        testCMD.Parameters("@TIPO_ESTRAZIONE").Direction = Data.ParameterDirection.Input
-        testCMD.Parameters("@TIPO_ESTRAZIONE").Value = reportType
-        testCMD.Parameters.Add("@retval", Data.SqlDbType.Int)
-        testCMD.Parameters("@retval").Direction = Data.ParameterDirection.Output
+            testCMD.Parameters("@idsez").Value = 1
+            testCMD.ExecuteScalar()
 
-        testCMD.ExecuteScalar()
-        ret = testCMD.Parameters("@retval").Value
-        queryNumber += 3
-        progress.Report(queryNumber * progressStep)
+            ret2 = testCMD.Parameters("@retval").Value
+            dataType = " AND TIPO_DATO IS NULL ORDER BY INS_ORDER"
 
-        testCMD.Parameters("@idsez").Value = 1
-        testCMD.ExecuteScalar()
+        End If
 
-        ret2 = testCMD.Parameters("@retval").Value
-        Dim log_statement As String = "SELECT * FROM [ARPA_WEB_MASSICI_CAMINI] WHERE IDX_REPORT = " & ret.ToString() & " AND TIPO_DATO IS NULL ORDER BY INS_ORDER"
-        command = New System.Data.SqlClient.SqlCommand(log_statement, connection)
+
+        Dim logStatement As String = "SELECT * FROM [ARPA_WEB_MASSICI_CAMINI] WHERE IDX_REPORT = " & ret.ToString() & dataType
+        command = New System.Data.SqlClient.SqlCommand(logStatement, connection)
 
         reader = command.ExecuteReader()
-        log_statement = "SELECT * FROM [ARPA_WEB_MASSICI_CAMINI] WHERE IDX_REPORT = " & ret2.ToString() & " AND TIPO_DATO IS NULL ORDER BY INS_ORDER"
-        command2 = New System.Data.SqlClient.SqlCommand(log_statement, connection2)
+        logStatement = "SELECT * FROM [ARPA_WEB_MASSICI_CAMINI] WHERE IDX_REPORT = " & ret2.ToString() & dataType
+        command2 = New System.Data.SqlClient.SqlCommand(logStatement, connection2)
         Dim reader2 As System.Data.SqlClient.SqlDataReader
         reader2 = command2.ExecuteReader()
         Dim dr As Data.DataRow = dt.NewRow()
@@ -276,23 +287,46 @@ Public Class Form1
                 dr("E10Q_POLVERI") = reader("E10Q_POLVERI")
                 dr("E10Q_CO") = reader("E10Q_CO")
                 dr("E10Q_COV") = reader("E10Q_COV")
-                dr("NOX_SOMMA") = reader("NOX_SOMMA")
-                dr("SO2_SOMMA") = reader("SO2_SOMMA")
-                dr("POLVERI_SOMMA") = reader("POLVERI_SOMMA")
-                dr("CO_SOMMA") = reader("CO_SOMMA")
+
+                If whatTable = 1 Then
+                    dr("NOX_SOMMA") = reader("NOX_SOMMA")
+                    dr("SO2_SOMMA") = reader("SO2_SOMMA")
+                    dr("POLVERI_SOMMA") = reader("POLVERI_SOMMA")
+                    dr("CO_SOMMA") = reader("CO_SOMMA")
 
 
-                dr("COV_SOMMA") = reader("COV_SOMMA")
-                dr("NH3_SOMMA") = reader("NH3_SOMMA")
-                dr("NOX57_SOMMA") = reader("NOX57_SOMMA")
+                    dr("COV_SOMMA") = reader("COV_SOMMA")
+                    dr("NH3_SOMMA") = reader("NH3_SOMMA")
+                    dr("NOX57_SOMMA") = reader("NOX57_SOMMA")
+
+                Else
+                    If (reader("TIPO_DATO").ToString().Contains("DISP")) Then
+                        For i As Integer = 3 To dr.Table.Columns.Count - 1 Step 1
+                            dr(i) = String.Format(culture, "{0:P2}", Double.Parse(dr(i), culture.NumberFormat))
+                        Next
+                    ElseIf (reader("TIPO_DATO").ToString().Contains("AVG") Or reader("TIPO_DATO").ToString().Contains("Totale")) Then
+                        For i As Integer = 3 To dr.Table.Columns.Count - 1 Step 1
+                            dr(i) = String.Format(culture, "{0:n2}", Double.Parse(dr(i), culture.NumberFormat))
+                        Next
+                    ElseIf (reader("TIPO_DATO").ToString().Contains("N.F.") Or reader("TIPO_DATO").ToString().Contains("VALIDITA")) Then
+                        For i As Integer = 3 To dr.Table.Columns.Count - 1 Step 1
+                            dr(i) = String.Format(culture, "{0:n0}", Double.Parse(dr(i), culture.NumberFormat))
+                        Next
+                    End If
+
+                End If
+
+
                 dt.Rows.Add(dr)
                 dr = dt.NewRow()
 
 
                 If (startTime < Date.Parse(datanh3)) Then
                     hiddenColumns.Add("E9Q_NH3")
-                    hiddenColumns.Add("NH3_SOMMA")
-                    hiddenColumns.Add("NOX57_SOMMA")
+                    If whatTable = 1 Then
+                        hiddenColumns.Add("NH3_SOMMA")
+                        hiddenColumns.Add("NOX57_SOMMA")
+                    End If
                 End If
 
 
@@ -306,15 +340,29 @@ Public Class Form1
                 If hiddenColumns.Count = 0 Then
                     For Each column As DataGridViewColumn In dgv.Columns
                         ' Verifica se il nome della colonna corrisponde ai nomi specificati
-                        If column.DataPropertyName = "Ed9Q_NH3" Or column.DataPropertyName = "NH3_SOMMA" Or column.DataPropertyName = "NOX57_SOMMA" Then
+                        If column.DataPropertyName = "E9Q_NH3" Or column.DataPropertyName = "NH3_SOMMA" Or column.DataPropertyName = "NOX57_SOMMA" Then
                             column.Visible = True
                         End If
                     Next
                 End If
             End While
+
             queryNumber += 1
             progress.Report(queryNumber * progressStep)
+
         End If
+
+        connection.Close()
+        connection2.Close()
+
+        'If whatTable = 2 Then
+        '    connection2.Open()
+        '    logStatement = "DELETE FROM ARPA_WEB_MASSICI_CAMINI"
+        '    Using deleteCmd As New SqlCommand(logStatement, connection2)
+        '        deleteCmd.ExecuteNonQuery()
+        '    End Using
+        '    connection2.Close()
+        'End If
 
         Return dt
     End Function
@@ -375,7 +423,51 @@ Public Class Form1
         dgv.Width = 1800
         dgv.AutoGenerateColumns = True
 
-        
+
+
+        For Each col As DataGridViewColumn In dgv.Columns
+            col.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter
+            col.DefaultCellStyle.Font = New Font(dgv.Font, FontStyle.Bold)
+        Next
+
+
+        dgv2 = New DataGridView()
+        dgv2.Visible = False
+        dgv2.Dock = DockStyle.Fill
+        dgv2.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
+        dgv2.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
+        dgv2.AllowUserToAddRows = False
+        dgv2.AllowUserToDeleteRows = False
+        dgv2.AllowUserToResizeRows = False
+        dgv2.RowHeadersVisible = False
+        dgv2.Width = 1800
+        dgv2.AutoGenerateColumns = True
+
+
+
+        For Each col As DataGridViewColumn In dgv2.Columns
+            col.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter
+            col.DefaultCellStyle.Font = New Font(dgv2.Font, FontStyle.Bold)
+        Next
+
+    End Sub
+
+
+    Private Sub SetDataGridView2()
+
+        dgv = New DataGridView()
+        dgv.Visible = False
+        dgv.Dock = DockStyle.Fill
+        dgv.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
+        dgv.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
+        dgv.AllowUserToAddRows = False
+        dgv.AllowUserToDeleteRows = False
+        dgv.AllowUserToResizeRows = False
+        dgv.RowHeadersVisible = False
+        dgv.Width = 1800
+        dgv.AutoGenerateColumns = True
+
+
 
         For Each col As DataGridViewColumn In dgv.Columns
             col.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter
@@ -403,8 +495,7 @@ Public Class Form1
 
     End Sub
 
-    Private Sub Button2_Click(sender As Object, e As EventArgs) Handles Button2.Click
-
+    Private Sub Button2_Click_(sender As Object, e As EventArgs) Handles Button2.Click
         Button2.Enabled = False
         Button3.Enabled = False
         Dim excel As New Microsoft.Office.Interop.Excel.Application
@@ -416,7 +507,7 @@ Public Class Form1
         Dim exePath As String = Application.StartupPath
         Dim rootPath As String = Directory.GetParent(Directory.GetParent(exePath).FullName).FullName
         Dim reportTitle As String = ""
-        
+
 
 
         Select Case reportType
@@ -430,7 +521,70 @@ Public Class Form1
                 d2 = New Date(2020, mesenh3, 1)
         End Select
 
+        'excel.DisplayAlerts = False
+        System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.CreateSpecificCulture("en-US")
 
+        If (startDate >= d2) Then
+            templatePath = Path.Combine(rootPath, "template", "E9_152_MESE_MASS_CAMINI.xls")
+        Else
+            templatePath = Path.Combine(rootPath, "template", "152_MESE_MASS_CAMINI.xls")
+
+        End If
+        wBook = excel.Workbooks.Open(templatePath)
+        wSheet = wBook.ActiveSheet()
+
+        Dim reportFileXls = reportTitle & ".xls"
+        Dim reportFilePdf = reportTitle & ".pdf"
+        Dim reportPath = Path.Combine(rootPath, "report", reportFileXls)
+        Dim reportPathPdf = Path.Combine(rootPath, "report", reportFilePdf)
+        'wBook.SaveAs(reportPath, Microsoft.Office.Interop.Excel.XlFileFormat.xlWorkbookNormal, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, Microsoft.Office.Interop.Excel.XlSaveAsAccessMode.xlNoChange)
+        '  wSheet.PageSetup.PrintArea = "A1:Z60"
+        wSheet.PageSetup.PaperSize = Microsoft.Office.Interop.Excel.XlPaperSize.xlPaperA4
+        wSheet.PageSetup.Orientation = Microsoft.Office.Interop.Excel.XlPageOrientation.xlLandscape
+        wSheet.ExportAsFixedFormat(Microsoft.Office.Interop.Excel.XlFixedFormatType.xlTypePDF, reportPathPdf, Quality:=Microsoft.Office.Interop.Excel.XlFixedFormatQuality.xlQualityStandard, _
+                    IncludeDocProperties:=True, IgnorePrintAreas:=False, _
+                    OpenAfterPublish:=False)
+        wBook.Close()
+        excel.Quit()
+
+        Marshal.ReleaseComObject(wSheet)
+        Marshal.ReleaseComObject(wBook)
+
+        Marshal.ReleaseComObject(excel)
+        wSheet = Nothing
+        wBook = Nothing
+        ' wSheet = DBNull.Value
+        excel = Nothing
+    End Sub
+
+    Private Sub Button2_Click(sender As Object, e As EventArgs) Handles Button2.Click
+
+        Button2.Enabled = False
+        Button3.Enabled = False
+        Dim excel As New Microsoft.Office.Interop.Excel.Application
+        Dim wBook As Microsoft.Office.Interop.Excel.Workbook
+        Dim wSheet As Microsoft.Office.Interop.Excel.Worksheet
+        Dim startDate As New DateTime(DateTimePicker1.Value.Year, 1, 1)
+        Dim endDate As New DateTime(DateTimePicker2.Value.Year, 1, 1)
+        Dim templatePath As String
+        Dim exePath As String = Application.StartupPath
+        Dim rootPath As String = Directory.GetParent(Directory.GetParent(exePath).FullName).FullName
+        Dim reportTitle As String = ""
+
+
+
+        Select Case reportType
+            Case 0
+                reportTitle = "152_MASSICO_ANNO"
+                datanh3 = "01/01/2020"
+                d2 = New Date(2020, 1, 1)
+            Case 1
+                d2 = New Date(2020, mesenh3, 1)
+            Case 2
+                d2 = New Date(2020, mesenh3, 1)
+        End Select
+
+        'excel.DisplayAlerts = False
         System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.CreateSpecificCulture("en-US")
 
         If (startDate >= d2) Then
@@ -481,8 +635,12 @@ Public Class Form1
             quit = 42
         End If
         Controls.Add(dgv)
+        Controls.Add(dgv2)
+
         dgv.Visible = True
         dgv.Visible = False
+        dgv2.Visible = True
+        dgv2.Visible = False
         'riga grigia
         For i = 0 To dgv.Rows.Count - 2  'Escluse righe VLE, superi, Max e Min
             wSheet.Rows(cc + i).Insert()
@@ -537,6 +695,208 @@ Public Class Form1
                             wSheet.Cells(i + 11, kk) = cellValue
                         End If
                     End If
+                End If
+            Next
+        Next
+
+        tabspace = 11 + dgv.Rows.Count + 4 ' spazio tra le due tabelle
+        'per modificare le righe (quantità, prima erano 6) della seconda tabella(oer valide, ore n.f) modificare il GridView2.Rows.Count e gv_dailyrep.Rows.Count.(prima a +3 e -4)
+
+        For i = dgv.Rows.Count To dgv2.Rows.Count + dgv.Rows.Count + 2
+            wSheet.Rows(cc + i + 1).Insert()
+        Next
+        'la tabella in basso
+        For i = 0 To dgv2.Rows.Count - 3
+            Dim currentRow As DataGridViewRow = dgv2.Rows(i)
+            app = "B" & i + tabspace & ":" & stringa & i + tabspace
+            wSheet.Range(app).NumberFormat = "@"
+            wSheet.Range(app).BorderAround()
+            app = "C" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "D" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "E" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "F" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "G" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "H" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "I" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "J" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "K" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "L" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "M" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "N" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "O" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "P" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "Q" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "R" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "S" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "T" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "U" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "V" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "W" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "X" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "Y" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "Z" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "AA" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "AB" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "AC" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "AD" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "AE" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "AF" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            app = "AG" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "AH" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "AI" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "AJ" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "AK" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "AL" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "AM" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "AN" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "AO" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "AP" & i + tabspace
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            If (startDate >= d2) Then
+                app = "AQ" & i + tabspace
+                wSheet.Range(app).BorderAround()
+                wSheet.Range(app).HorizontalAlignment = -4108
+                wSheet.Range(app).VerticalAlignment = -4108
+            End If
+
+
+            'lunghezza tabella secondaria
+            For kk = 2 To quit
+                Dim cellValue As String
+                If currentRow.Cells(kk).Value IsNot Nothing Then
+                    cellValue = currentRow.Cells(kk).Value.ToString()
+                Else
+                    cellValue = String.Empty
+                End If
+
+                If String.IsNullOrEmpty(cellValue) OrElse cellValue = "&nbsp;" Then
+                    wSheet.Cells(i + tabspace, kk) = ""
+                Else
+                    If (startDate < d2 And kk >= 38) Then
+                        wSheet.Cells(i + tabspace, kk) = currentRow.Cells(kk + 1).Value.ToString()
+                    Else
+                        wSheet.Cells(i + tabspace, kk) = currentRow.Cells(kk).Value.ToString()
+                    End If
+
                 End If
             Next
         Next
@@ -732,16 +1092,135 @@ Public Class Form1
             Next
         End If
 
-        excel.DisplayAlerts = False
+        Dim cellOffset As Integer = tabspace
+        ' Dim stringa As String
+
+        For i = 3 To dgv2.Rows.Count - 1
+
+            Dim currentRow As DataGridViewRow = dgv2.Rows(i)
+            'righe nella tabella i-1 elimina una riga
+            If (reportType = 1 And ((currentRow.Cells(2).Value.Contains("Sup")) Or (currentRow.Cells(2).Value.Contains("VLE")))) Then
+                Continue For
+            End If
+
+            Dim dontMerge As Boolean
+            dontMerge = (currentRow.Cells(2).Value.Contains("Totale"))
+
+            app = "B" & i + cellOffset - 1
+            wSheet.Range(app).BorderAround()
+            app = "B" & i + cellOffset & ":" & stringa & i + cellOffset
+
+            For Each cell In wSheet.Range(app).Cells
+                wSheet.Range(cell, cell).BorderAround()
+            Next
+
+            app = "C" & i + cellOffset & ":G" & i + cellOffset
+            wSheet.Range(app).BorderAround()
+            If (Not (dontMerge)) Then
+                wSheet.Range(app).Merge()
+            End If
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "H" & i + cellOffset & ":L" & i + cellOffset
+            wSheet.Range(app).BorderAround()
+            If (Not (dontMerge)) Then
+                wSheet.Range(app).Merge()
+            End If
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "M" & i + cellOffset & ":Q" & i + cellOffset
+            wSheet.Range(app).BorderAround()
+            If (Not (dontMerge)) Then
+                wSheet.Range(app).Merge()
+            End If
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "R" & i + cellOffset & ":V" & i + cellOffset
+            wSheet.Range(app).BorderAround()
+            If (Not (dontMerge)) Then
+                wSheet.Range(app).Merge()
+            End If
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "W" & i + cellOffset & ":AA" & i + cellOffset
+            wSheet.Range(app).BorderAround()
+            If (Not (dontMerge)) Then
+                wSheet.Range(app).Merge()
+            End If
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "AB" & i + cellOffset & ":AF" & i + cellOffset
+            wSheet.Range(app).BorderAround()
+            If (Not (dontMerge)) Then
+                wSheet.Range(app).Merge()
+            End If
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            If (startDate >= d2) Then
+                app = "AG" & i + cellOffset & ":AL" & i + cellOffset
+            Else
+                app = "AG" & i + cellOffset & ":AK" & i + cellOffset
+            End If
+
+            wSheet.Range(app).BorderAround()
+            If (Not (dontMerge)) Then
+                wSheet.Range(app).Merge()
+            End If
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            If (startDate >= d2) Then
+                app = "AM" & i + cellOffset & ":AQ" & i + cellOffset
+            Else
+                app = "AL" & i + cellOffset & ":AP" & i + cellOffset
+            End If
+            wSheet.Range(app).BorderAround()
+            If (Not (dontMerge)) Then
+                wSheet.Range(app).Merge()
+            End If
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+
+
+            'tabella secondaria 43
+            'riga)
+
+            For kk = 2 To 43
+
+                Dim cellValue As String = String.Empty
+                If currentRow.Cells(kk).Value IsNot Nothing Then
+                    cellValue = currentRow.Cells(kk).Value.ToString()
+                Else
+                    cellValue = String.Empty
+                End If
+
+                If String.IsNullOrEmpty(cellValue) OrElse cellValue = "&nbsp;" Then
+                    wSheet.Cells(i + cellOffset, kk) = ""
+                Else
+                    If i = 2 Then ' ORA
+                        wSheet.Cells(i + cellOffset, kk) = String.Format("{0:HH.mm}", currentRow.Cells(kk).Value)
+                    Else
+                        If (startDate < d2 And kk = 38) Then
+                            wSheet.Cells(i + cellOffset, kk) = currentRow.Cells(kk + 1).Value.ToString()
+                        Else
+                            wSheet.Cells(i + cellOffset, kk) = currentRow.Cells(kk).Value.ToString()
+                        End If
+
+                    End If
+                End If
+            Next
+        Next
+
+
+
         Dim reportFileXls = reportTitle & ".xls"
         Dim reportFilePdf = reportTitle & ".pdf"
         Dim reportPath = Path.Combine(rootPath, "report", reportFileXls)
         Dim reportPathPdf = Path.Combine(rootPath, "report", reportFilePdf)
         wBook.SaveAs(reportPath, Microsoft.Office.Interop.Excel.XlFileFormat.xlWorkbookNormal, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, Microsoft.Office.Interop.Excel.XlSaveAsAccessMode.xlNoChange)
-        '  wSheet.PageSetup.PrintArea = "A1:Z60"
+        wSheet.PageSetup.PrintArea = "A1:Z60"
         wSheet.PageSetup.PaperSize = Microsoft.Office.Interop.Excel.XlPaperSize.xlPaperA4
         wSheet.PageSetup.Orientation = Microsoft.Office.Interop.Excel.XlPageOrientation.xlLandscape
-        wSheet.ExportAsFixedFormat(Microsoft.Office.Interop.Excel.XlFixedFormatType.xlTypePDF, reportFilePdf, Quality:=Microsoft.Office.Interop.Excel.XlFixedFormatQuality.xlQualityStandard, _
+        wSheet.ExportAsFixedFormat(Microsoft.Office.Interop.Excel.XlFixedFormatType.xlTypePDF, reportPathPdf, Quality:=Microsoft.Office.Interop.Excel.XlFixedFormatQuality.xlQualityStandard, _
                     IncludeDocProperties:=True, IgnorePrintAreas:=False, _
                     OpenAfterPublish:=False)
         wBook.Close()

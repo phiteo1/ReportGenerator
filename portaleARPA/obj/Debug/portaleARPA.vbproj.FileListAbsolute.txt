@@ -20,3 +20,13 @@ C:\Users\Administrator\Documents\portaleTarantoNew\portaleTarantoNew\portaleARPA
 C:\Users\Administrator\Documents\portaleTarantoNew\portaleTarantoNew\portaleARPA\portaleARPA\obj\Debug\portaleARPA.Form1.resources
 C:\Users\Administrator\Documents\portaleTarantoNew\portaleTarantoNew\portaleARPA\portaleARPA\obj\Debug\portaleARPA.Resources.resources
 C:\Users\Administrator\Documents\portaleTarantoNew\portaleTarantoNew\portaleARPA\portaleARPA\obj\Debug\portaleARPA.vbproj.GenerateResource.Cache
+E:\GeneratoreReportTaranto\ReportGeneratorTaranto\portaleARPA\bin\Debug\portaleARPA.exe.config
+E:\GeneratoreReportTaranto\ReportGeneratorTaranto\portaleARPA\obj\Debug\portaleARPA.exe
+E:\GeneratoreReportTaranto\ReportGeneratorTaranto\portaleARPA\obj\Debug\portaleARPA.xml
+E:\GeneratoreReportTaranto\ReportGeneratorTaranto\portaleARPA\obj\Debug\portaleARPA.pdb
+E:\GeneratoreReportTaranto\ReportGeneratorTaranto\portaleARPA\bin\Debug\portaleARPA.exe
+E:\GeneratoreReportTaranto\ReportGeneratorTaranto\portaleARPA\bin\Debug\portaleARPA.pdb
+E:\GeneratoreReportTaranto\ReportGeneratorTaranto\portaleARPA\bin\Debug\portaleARPA.xml
+E:\GeneratoreReportTaranto\ReportGeneratorTaranto\portaleARPA\obj\Debug\portaleARPA.Form1.resources
+E:\GeneratoreReportTaranto\ReportGeneratorTaranto\portaleARPA\obj\Debug\portaleARPA.Resources.resources
+E:\GeneratoreReportTaranto\ReportGeneratorTaranto\portaleARPA\obj\Debug\portaleARPA.vbproj.GenerateResource.Cache
