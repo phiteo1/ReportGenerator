@@ -20,6 +20,7 @@ Public Class Form1
     Dim hiddenColumns As New List(Of String)()
     Dim d2 As Date
     Dim bolla As Byte = 255
+    Dim aia As Int32 = 1
 
     Enum State                  'State Machine of the downloading process
         DataLoading = 1
@@ -37,6 +38,7 @@ Public Class Form1
         connectionString = ConfigurationManager.ConnectionStrings("GLOBAL_CONN_STR").ConnectionString
         ComboBox1.SelectedIndex = 0
         ComboBox2.SelectedIndex = 0
+        TextBox1.Visible = False
         DateTimePicker1.Value = Date.Now.AddYears(-1)
         culture = System.Globalization.CultureInfo.CreateSpecificCulture("en-US")
         culture.NumberFormat.NumberGroupSeparator = ""
@@ -48,6 +50,7 @@ Public Class Form1
     Private Async Sub Button1_Click(sender As Object, e As EventArgs) Handles Button1.Click
 
         DisableForm()
+        TextBox1.Visible = True
         reportType = ComboBox2.SelectedIndex
         section = GetSection(ComboBox1.SelectedItem)
         Dim startDate As New DateTime(DateTimePicker1.Value.Year, 1, 1)
@@ -87,6 +90,10 @@ Public Class Form1
         Dim dataTable2 As DataTable
         Controls.Add(dgv)
         Controls.Add(dgv2)
+
+        If Not CheckBox1.Checked Then
+            aia = 0
+        End If
 
         While (startDate <= endDate)
             ProgressBar1.Value = 0
@@ -492,7 +499,6 @@ Public Class Form1
         Dim queryNumber As Integer = 0
         Dim queriesCount As Integer = 4
         Dim progressStep As Integer = 100 \ queriesCount
-        Dim aia As Int32 = 1
 
 
         Try
@@ -774,7 +780,7 @@ Public Class Form1
         If (reader.HasRows) Then
             While reader.Read()
                 dr("IDX_REPORT") = reader("IDX_REPORT")
-                dr("INS_ORDER") = String.Format("{0:n0}", reader("INS_ORDER"))
+                'dr("INS_ORDER") = String.Format("{0:n0}", reader("INS_ORDER"))
                 If (type = 2) Then
                     dr("ORA") = "Giorno"
                 ElseIf (type = 1) Then
@@ -798,7 +804,12 @@ Public Class Form1
                     dr("COV_AVAIL") = String.Format("{0:##}", count5 / max_ore * 100) & "%"
                     dr("FUMI_SECCO") = String.Format(nfi, "{0:0}", reader("FUMI_SECCO"))
                     dr("FUMI_AVAIL") = String.Format("{0:##}", count6 / max_ore * 100) & "%"
-                    dr("TIPO_DATO") = reader("TIPO_DATO").ToString()
+
+                    If reader("TIPO_DATO").ToString().Contains("AVG") Then          ''Il valore di media non va nello specchietto subito sotto alla tabella principale, non in fondo alla tabella                    
+                        dr("TIPO_DATO") = ""
+                    Else
+                        dr("TIPO_DATO") = reader("TIPO_DATO").ToString()
+                    End If
 
                 Else
                     dr("SO2_SECCO") = String.Format("{0:n2}", reader("SO2_SECCO"))
@@ -813,12 +824,16 @@ Public Class Form1
                     dr("COV_AVAIL") = String.Format("{0:##}", (count5 / max_ore * 100) / 7) & "%"
                     dr("FUMI_SECCO") = String.Format(nfi, "{0:0}", reader("FUMI_SECCO"))
                     dr("FUMI_AVAIL") = String.Format("{0:##}", (count6 / max_ore * 100) / 7) & "%"
-                    dr("TIPO_DATO") = reader("TIPO_DATO").ToString()
+                    If reader("TIPO_DATO").ToString().Contains("AVG") Then          ''Il valore di media non va nello specchietto subito sotto alla tabella principale, non in fondo alla tabella                    
+                        dr("TIPO_DATO") = ""
+                    Else
+                        dr("TIPO_DATO") = reader("TIPO_DATO").ToString()
+                    End If
 
                 End If
 
-                dt.Rows.Add(dr)
-                dr = dt.NewRow()
+                    dt.Rows.Add(dr)
+                    dr = dt.NewRow()
 
             End While
 
@@ -966,7 +981,6 @@ Public Class Form1
                 d2 = New Date(2020, mesenh3, 1)
         End Select
 
-        ComboStatus.Report(State.DataLoading)
         System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.CreateSpecificCulture("en-US")
 
         If (startDate >= d2) Then
@@ -1464,7 +1478,6 @@ Public Class Form1
 
         End If
 
-        ComboStatus.Report(State.DataLoading)
         System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.CreateSpecificCulture("en-US")
 
 
@@ -1480,7 +1493,7 @@ Public Class Form1
                 wSheet.Range("NomeTabella").Value = "152 CONCENTRAZIONI ANNUALE CAMINI DI RAFFINERIA"
                 wSheet.Range("IntervalloDate").Value = "Report Annuale dell'anno " + String.Format(New CultureInfo("it-IT", False), "{0:yyyy}", DateTime.Parse(startDate, New CultureInfo("it-IT", False)))
                 wSheet.Cells(2, 8).Value = "MESE"
-                reportTitle = "152_BOLLA_ANNO" & startDate.Year.ToString()
+                reportTitle = "152_BOLLA_ANNO_" & startDate.Year.ToString()
             Case 1
                 ' TODO
             Case 2
@@ -1670,7 +1683,7 @@ Public Class Form1
 
             colgv = 1
             For tabcounter = 2 To dgv2.Columns.Count
-                If dgv2.Rows(z).Cells(tabcounter - 1).Value.ToString() = "&nbsp;" Then
+                If dgv2.Rows(z).Cells(tabcounter - 1).Value.ToString() = "&nbsp;" Then 'Or dgv2.Rows(z).Cells(tabcounter - 1).Value.ToString().Contains("AVG")
                     wSheet.Cells(insert_tab, colgv) = ""
                 Else
                     wSheet.Cells(insert_tab, colgv) = dgv2.Rows(z).Cells(tabcounter - 1).Value.ToString()
@@ -1718,7 +1731,6 @@ Public Class Form1
         End If
 
     End Sub
-
 
     Private Sub DisableForm()
 
