@@ -24,7 +24,7 @@ Public Class Form1
     Enum State                  'State Machine of the downloading process
         DataLoading = 1
         TableLoading = 2
-        CaricamentoFogli = 3
+        SheetLoading = 3
         FinishedReport = 4
         Finished = 5
     End Enum
@@ -47,7 +47,7 @@ Public Class Form1
 
     Private Async Sub Button1_Click(sender As Object, e As EventArgs) Handles Button1.Click
 
-        Button1.Enabled = False
+        DisableForm()
         reportType = ComboBox2.SelectedIndex
         section = GetSection(ComboBox1.SelectedItem)
         Dim startDate As New DateTime(DateTimePicker1.Value.Year, 1, 1)
@@ -71,15 +71,15 @@ Public Class Form1
                                                                    actualState = State.TableLoading
                                                                Case 3
                                                                    TextBox1.Text = "Sheet Creation..."
-                                                                   actualState = State.CaricamentoFogli
+                                                                   actualState = State.SheetLoading
                                                                Case 4
-                                                                   TextBox1.Text = "Report  for the year " & startDate.Year.ToString & " downloaded succesfully"
+                                                                   TextBox1.Text = "Report year " & startDate.Year.ToString & " downloaded succesfully"
                                                                    actualState = State.FinishedReport
                                                                Case 5
                                                                    TextBox1.Text = "Report generation finished!"
                                                                    actualState = State.Finished
                                                                    Button1.Text = "Generate Again"
-                                                                   Button1.Enabled = True
+                                                                   EnableForm()
                                                                    Me.Hide()
                                                            End Select
                                                        End Sub)
@@ -93,8 +93,20 @@ Public Class Form1
             If (Not ProgressBar1.Visible) Then
                 ProgressBar1.Visible = True
             End If
-            dataTable1 = Await Task.Run(Function() GetData(barProgress, startDate, endDate, section, reportType, 1, dgv))   'Get the data from the database and assign to first data table structure. The function is runned in an other trhead in order to allow the GUI to refresh properly
-            dataTable2 = Await Task.Run(Function() GetData(barProgress, startDate, endDate, section, reportType, 2, dgv2))  'Get the data from the database and assign to second data table structure
+            If section = 8 Then
+                If bolla = 0 Then
+                    dataTable1 = Await Task.Run(Function() GetDataFlussi(barProgress, startDate, endDate, section, reportType, 1, dgv))   'Get the data from the database and assign to first data table structure. The function is runned in an other trhead in order to allow the GUI to refresh properly
+                    dataTable2 = Await Task.Run(Function() GetDataFlussi(barProgress, startDate, endDate, section, reportType, 2, dgv2))  'Get the data from the database and assign to second data table structure
+                Else
+                    dataTable1 = Await Task.Run(Function() GetDataBolla1(barProgress, startDate, endDate, section, reportType, dgv))   'Get the data from the database and assign to first data table structure. The function is runned in an other trhead in order to allow the GUI to refresh properly
+                    dataTable2 = Await Task.Run(Function() GetDataBolla2(barProgress, startDate, endDate, section, reportType, dgv2))  'Get the data from the database and assign to second data table structure
+                End If
+
+            Else
+                dataTable1 = Nothing
+                dataTable2 = Nothing
+            End If
+
             dgv.DataSource = dataTable1                                                                                     'Bind the data to the first DataGridView
             dgv2.DataSource = dataTable2                                                                                    'Bind the data to the second DataGridView
             dgv.Visible = True
@@ -103,7 +115,16 @@ Public Class Form1
             dgv2.Visible = False
             ProgressBar1.Visible = False
             TextBox1.Visible = True
-            Await Task.Run(Sub() downloadReport(StatusProgress, startDate, endDate))                                        'Download the reports of the selected years. The function is runned in an other trhead in order to allow the GUI to refresh properly 
+
+            If bolla = 0 Then
+                Await Task.Run(Sub() downloadReportFlussi(StatusProgress, startDate, endDate))                              'Download the reports of the selected years. The function is runned in an other trhead in order to allow the GUI to refresh properly 
+
+            ElseIf bolla = 1 Then
+                Await Task.Run(Sub() downloadReportBolla(StatusProgress, startDate, endDate))
+            Else
+                'todo
+            End If
+
             Dim deltaTime As String
             If (reportType = 0) Then
                 deltaTime = "yyyy"                                                                                          'Add one year or one month according to the report type choosed
@@ -153,7 +174,7 @@ Public Class Form1
 
     End Function
 
-    Private Function GetData(progress As IProgress(Of Integer), startTime As DateTime, endTime As DateTime, section As Int32, type As Int32, whatTable As Byte, dgv As DataGridView) As Data.DataTable
+    Private Function GetDataFlussi(progress As IProgress(Of Integer), startTime As DateTime, endTime As DateTime, section As Int32, type As Int32, whatTable As Byte, dgv As DataGridView) As Data.DataTable
 
         Dim dt As New Data.DataTable()
         Dim command As System.Data.SqlClient.SqlCommand
@@ -461,12 +482,368 @@ Public Class Form1
         Return dt
     End Function
 
+    Private Function GetDataBolla1(progress As IProgress(Of Integer), startTime As DateTime, endTime As DateTime, section As Int32, type As Int32, dgv As DataGridView) As Data.DataTable
+
+        Dim dt As New Data.DataTable()
+        Dim command As System.Data.SqlClient.SqlCommand
+        Dim reader As System.Data.SqlClient.SqlDataReader
+        Dim connection As New SqlConnection(connectionString)
+        Dim connection2 As New SqlConnection(connectionString)
+        Dim queryNumber As Integer = 0
+        Dim queriesCount As Integer = 4
+        Dim progressStep As Integer = 100 \ queriesCount
+        Dim aia As Int32 = 1
+
+
+        Try
+            ' Tenta di aprire la connessione
+            connection.Open()
+            connection2.Open()
+        Catch ex As Exception
+            ' Gestione degli errori
+            MessageBox.Show("Errore durante la connessione al database: " & ex.Message, "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Return dt
+        End Try
+
+        dt.Columns.Add(New Data.DataColumn("IDX_REPORT", GetType(Double)))
+        dt.Columns.Add(New Data.DataColumn("INS_ORDER", GetType(Integer)))
+        dt.Columns.Add(New Data.DataColumn("ORA", GetType(String)))
+
+        dt.Columns.Add(New Data.DataColumn("SO2_SECCO", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("SO2_AVAIL", GetType(String)))
+
+        dt.Columns.Add(New Data.DataColumn("CO_SECCO", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("CO_AVAIL", GetType(String)))
+
+        dt.Columns.Add(New Data.DataColumn("NOX_SECCO", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("NOX_AVAIL", GetType(String)))
+
+        dt.Columns.Add(New Data.DataColumn("POL_SECCO", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("POL_AVAIL", GetType(String)))
+
+        dt.Columns.Add(New Data.DataColumn("COV_SECCO", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("COV_AVAIL", GetType(String)))
+
+        dt.Columns.Add(New Data.DataColumn("FUMI_SECCO", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("FUMI_AVAIL", GetType(String)))
+
+        dt.Columns.Add(New Data.DataColumn("TIPO_DATO", GetType(String)))
+
+        queryNumber += 1
+        progress.Report(queryNumber * progressStep)
+
+        Dim testCMD As Data.SqlClient.SqlCommand
+
+        If startTime >= "01/01/2018" Then
+            testCMD = New Data.SqlClient.SqlCommand("sp_AQMSNT_FILL_ARPA_CONCENTRAZIONI_CAMINI2", connection)
+            testCMD.Parameters.Add("@aia", Data.SqlDbType.Int, 11)
+            testCMD.Parameters("@aia").Direction = Data.ParameterDirection.Input
+            testCMD.Parameters("@aia").Value = aia
+
+
+        Else
+            testCMD = New Data.SqlClient.SqlCommand("sp_AQMSNT_FILL_ARPA_CONCENTRAZIONI_CAMINI", connection)
+
+
+        End If
+
+
+        testCMD.CommandType = Data.CommandType.StoredProcedure
+        testCMD.CommandTimeout = 18000
+        testCMD.Parameters.Add("@data", Data.SqlDbType.DateTime, 11)
+        testCMD.Parameters("@data").Direction = Data.ParameterDirection.Input
+        testCMD.Parameters("@data").Value = startTime
+        testCMD.Parameters.Add("@TIPO_ESTRAZIONE", Data.SqlDbType.Int, 11)
+        testCMD.Parameters("@TIPO_ESTRAZIONE").Direction = Data.ParameterDirection.Input
+        testCMD.Parameters("@TIPO_ESTRAZIONE").Value = reportType
+        testCMD.Parameters.Add("@retval", Data.SqlDbType.Int)
+        testCMD.Parameters("@retval").Direction = Data.ParameterDirection.Output
+        testCMD.ExecuteScalar()
+        ret = testCMD.Parameters("@retval").Value
+
+        queryNumber += 1
+        progress.Report(queryNumber * progressStep)
+
+
+        Dim logStatement As String = "SELECT * FROM [ARPA_WEB_CONCENTRAZIONI_CAMINI] WHERE IDX_REPORT = " & ret.ToString() & "  ORDER BY INS_ORDER"
+        command = New System.Data.SqlClient.SqlCommand(logStatement, connection)
+
+        reader = command.ExecuteReader()
+
+        Dim nfi As NumberFormatInfo = New CultureInfo("en-US", False).NumberFormat
+        nfi.NumberGroupSeparator = ""
+        Dim dr As Data.DataRow = dt.NewRow()
+        If (reader.HasRows) Then
+            While reader.Read()
+                dr("IDX_REPORT") = reader("IDX_REPORT")
+                dr("INS_ORDER") = String.Format("{0:n0}", reader("INS_ORDER"))
+                If (type = 2) Then
+                    dr("ORA") = String.Format("{0:HH.mm}", reader("ORA")) 'String.Format("{0:n2}", reader("NOX"))
+                ElseIf (type = 1) Then
+                    dr("ORA") = String.Format("{0:dd}", reader("ORA"))
+                Else
+                    dr("ORA") = String.Format("{0:MMMM}", reader("ORA"))
+                End If
+
+                ''Quando comincio a leggere i dati riassuntivi inserisco una riga vuota
+                If reader("TIPO_DATO").ToString().Contains("AVG") Then          ''Il valore di media non va nello specchietto subito sotto alla tabella principale, non in fondo alla tabella                    
+                    Continue While
+                ElseIf (reader("TIPO_DATO").ToString().Contains("MAX")) Then    '' I valori di massimo e minimo vanno in fondo alla prima tabella (v. pre_render)
+                    dr("ORA") = "MAX"
+                ElseIf (reader("TIPO_DATO").ToString().Contains("SUPERI")) Then
+                    dr("ORA") = "N Sup. Medie Giorn."
+                ElseIf (reader("TIPO_DATO").ToString().Contains("MIN")) Then
+                    dr("ORA") = "MIN"
+                ElseIf (reader("TIPO_DATO").ToString().Contains("VLE")) Then
+                    dt.Rows.Add()
+                    dr("ORA") = "VLE"
+                ElseIf (reader("TIPO_DATO").ToString() = "") Then               ''Se il valore è NULL vuol dire che sto leggendo un dato giornaliero, quindi non devo fare nulla di particolare
+
+                Else                                                            ''Negli altri casi ho raggiunto la fine della Tabella SQL con i dati di interesse e quindi esco senza scrivere altro
+                    Exit While
+                End If
+
+                Dim availability As Double
+                dr("SO2_SECCO") = String.Format("{0:n2}", reader("SO2_SECCO"))
+                dr("SO2_AVAIL") = String.Format("{0:0.00}", reader("SO2_AVAIL")) & "%"
+                If (Double.TryParse(reader("SO2_AVAIL").ToString, availability)) Then
+                    If (availability < 70) Then
+                        dr("SO2_SECCO") = dr("SO2_SECCO") + "(*)"
+                    End If
+                End If
+
+
+                dr("CO_SECCO") = String.Format("{0:n2}", reader("CO_SECCO"))
+                dr("CO_AVAIL") = String.Format("{0:0.00}", reader("CO_AVAIL")) & "%"
+                If (Double.TryParse(reader("CO_AVAIL").ToString, availability)) Then
+                    If (availability < 70) Then
+                        dr("CO_SECCO") = dr("CO_SECCO") + "(*)"
+                    End If
+                End If
+
+                dr("NOX_SECCO") = String.Format("{0:n2}", reader("NOX_SECCO"))
+                dr("NOX_AVAIL") = String.Format("{0:0.00}", reader("NOX_AVAIL")) & "%"
+                If (Double.TryParse(reader("NOX_AVAIL").ToString, availability)) Then
+                    If (availability < 70) Then
+                        dr("NOX_SECCO") = dr("NOX_SECCO") + "(*)"
+                    End If
+                End If
+
+                dr("POL_SECCO") = String.Format("{0:n2}", reader("POL_SECCO"))
+                dr("POL_AVAIL") = String.Format("{0:0.00}", reader("POL_AVAIL")) & "%"
+                If (Double.TryParse(reader("POL_AVAIL").ToString, availability)) Then
+                    If (availability < 70) Then
+                        dr("POL_SECCO") = dr("POL_SECCO") + "(*)"
+                    End If
+                End If
+
+                dr("COV_SECCO") = String.Format("{0:n2}", reader("COV_SECCO"))
+                dr("COV_AVAIL") = String.Format("{0:0.00}", reader("COV_AVAIL")) & "%"
+                If (Double.TryParse(reader("COV_AVAIL").ToString, availability)) Then
+                    If (availability < 70) Then
+                        dr("COV_SECCO") = dr("COV_SECCO") + "(*)"
+                    End If
+                End If
+
+                dr("FUMI_SECCO") = String.Format(nfi, "{0:n2}", reader("FUMI_SECCO"))
+                dr("FUMI_AVAIL") = String.Format("{0:0.00}", reader("FUMI_AVAIL")) & "%"
+                If (Double.TryParse(reader("FUMI_AVAIL").ToString, availability)) Then
+                    If (availability < 70) Then
+                        dr("FUMI_SECCO") = dr("FUMI_SECCO") + "(*)"
+                    End If
+                End If
+
+                If (reader("TIPO_DATO").ToString().Contains("VLE")) Then
+                    dr("FUMI_SECCO") = "-"
+                End If
+
+                If (reader("TIPO_DATO").ToString().Contains("SUPERI")) Then
+                    dr("SO2_SECCO") = String.Format("{0:n0}", reader("SO2_SECCO"))
+                End If
+
+                dr("TIPO_DATO") = reader("TIPO_DATO").ToString()
+                dt.Rows.Add(dr)
+                dr = dt.NewRow()
+            End While
+        End If
+
+
+        queryNumber += 1
+        progress.Report(queryNumber * progressStep)
+
+        connection.Close()
+        connection2.Close()
+
+        Return dt
+
+    End Function
+
+    Private Function GetDataBolla2(progress As IProgress(Of Integer), startTime As DateTime, endTime As DateTime, section As Int32, type As Int32, dgv As DataGridView) As Data.DataTable
+
+        Dim dt As New Data.DataTable()
+        Dim command As System.Data.SqlClient.SqlCommand
+        Dim reader As System.Data.SqlClient.SqlDataReader
+        Dim connection As New SqlConnection(connectionString)
+        Dim connection2 As New SqlConnection(connectionString)
+        Dim queryNumber As Integer = 3
+        Dim queriesCount As Integer = 4
+        Dim progressStep As Integer = 100 \ queriesCount
+        Dim aia As Int32 = 1
+        Dim dataType As String = " AND TIPO_DATO LIKE '%MAX_ORE%' ORDER BY INS_ORDER"
+
+        Try
+            ' Tenta di aprire la connessione
+            connection.Open()
+            connection2.Open()
+        Catch ex As Exception
+            ' Gestione degli errori
+            MessageBox.Show("Errore durante la connessione al database: " & ex.Message, "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Return dt
+        End Try
+
+        dt.Columns.Add(New Data.DataColumn("IDX_REPORT", GetType(Double)))
+        dt.Columns.Add(New Data.DataColumn("INS_ORDER", GetType(Integer)))
+        dt.Columns.Add(New Data.DataColumn("ORA", GetType(String)))
+
+        dt.Columns.Add(New Data.DataColumn("SO2_SECCO", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("SO2_AVAIL", GetType(String)))
+
+        dt.Columns.Add(New Data.DataColumn("CO_SECCO", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("CO_AVAIL", GetType(String)))
+
+        dt.Columns.Add(New Data.DataColumn("NOX_SECCO", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("NOX_AVAIL", GetType(String)))
+
+        dt.Columns.Add(New Data.DataColumn("POL_SECCO", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("POL_AVAIL", GetType(String)))
+
+        dt.Columns.Add(New Data.DataColumn("COV_SECCO", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("COV_AVAIL", GetType(String)))
+
+        dt.Columns.Add(New Data.DataColumn("FUMI_SECCO", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("FUMI_AVAIL", GetType(String)))
+
+        dt.Columns.Add(New Data.DataColumn("TIPO_DATO", GetType(String)))
+
+        'queryNumber += 1
+        'progress.Report(queryNumber * progressStep)
+
+        Dim logStatement As String = "SELECT * FROM [ARPA_WEB_CONCENTRAZIONI_CAMINI] WHERE IDX_REPORT = " & ret.ToString() & dataType
+        Dim max_ore As Integer
+        command = New System.Data.SqlClient.SqlCommand(logStatement, connection)
+        reader = command.ExecuteReader()
+
+        If (reader.HasRows) Then
+            While reader.Read()
+                max_ore = reader("SO2_SECCO")
+            End While
+        End If
+        reader.Close()
+
+        dataType = " AND TIPO_DATO LIKE '%COUNT%' ORDER BY INS_ORDER"
+        logStatement = "SELECT * FROM [ARPA_WEB_CONCENTRAZIONI_CAMINI] WHERE IDX_REPORT = " & ret.ToString() & dataType
+        Dim count1, count2, count3, count4, count5, count6 As Double
+        command = New System.Data.SqlClient.SqlCommand(logStatement, connection)
+        reader = command.ExecuteReader()
+
+        If (reader.HasRows) Then
+            While reader.Read()
+                count1 = reader("SO2_SECCO")
+                count2 = reader("CO_SECCO")
+                count3 = reader("NOX_SECCO")
+                count4 = reader("POL_SECCO")
+                count5 = reader("COV_SECCO")
+                count6 = reader("FUMI_SECCO")
+            End While
+
+        End If
+        reader.Close()
+
+        dataType = " AND TIPO_DATO LIKE '%AVG%' ORDER BY INS_ORDER"
+        logStatement = "SELECT * FROM [ARPA_WEB_CONCENTRAZIONI_CAMINI] WHERE IDX_REPORT = " & ret.ToString() & dataType
+        command = New System.Data.SqlClient.SqlCommand(logStatement, connection)
+        reader = command.ExecuteReader()
+
+        Dim nfi As NumberFormatInfo = New CultureInfo("en-US", False).NumberFormat
+        nfi.NumberGroupSeparator = ""
+        Dim dr As Data.DataRow = dt.NewRow()
+        ' Modifica per stored procedure, se la data selezionata è maggiore del 2018 avvio la divisione per 7 perchè uso l'altra stored procedure
+        Dim data As Date = #1/1/2018#
+        Dim result As Integer = Date.Compare(startTime, data)
+        ' Fine modifica
+        If (reader.HasRows) Then
+            While reader.Read()
+                dr("IDX_REPORT") = reader("IDX_REPORT")
+                dr("INS_ORDER") = String.Format("{0:n0}", reader("INS_ORDER"))
+                If (type = 2) Then
+                    dr("ORA") = "Giorno"
+                ElseIf (type = 1) Then
+                    dr("ORA") = "Mese"
+                Else
+                    dr("ORA") = "Anno"
+                End If
+
+
+                If result < 0 Then
+
+                    dr("SO2_SECCO") = String.Format("{0:n2}", reader("SO2_SECCO"))
+                    dr("SO2_AVAIL") = String.Format("{0:##}", count1 / max_ore * 100) & "%"
+                    dr("CO_SECCO") = String.Format("{0:n2}", reader("CO_SECCO"))
+                    dr("CO_AVAIL") = String.Format("{0:##}", count2 / max_ore * 100) & "%"
+                    dr("NOX_SECCO") = String.Format("{0:n2}", reader("NOX_SECCO"))
+                    dr("NOX_AVAIL") = String.Format("{0:##}", count3 / max_ore * 100) & "%"
+                    dr("POL_SECCO") = String.Format("{0:n2}", reader("POL_SECCO"))
+                    dr("POL_AVAIL") = String.Format("{0:##}", count4 / max_ore * 100) & "%"
+                    dr("COV_SECCO") = String.Format("{0:n2}", reader("COV_SECCO"))
+                    dr("COV_AVAIL") = String.Format("{0:##}", count5 / max_ore * 100) & "%"
+                    dr("FUMI_SECCO") = String.Format(nfi, "{0:0}", reader("FUMI_SECCO"))
+                    dr("FUMI_AVAIL") = String.Format("{0:##}", count6 / max_ore * 100) & "%"
+                    dr("TIPO_DATO") = reader("TIPO_DATO").ToString()
+
+                Else
+                    dr("SO2_SECCO") = String.Format("{0:n2}", reader("SO2_SECCO"))
+                    dr("SO2_AVAIL") = String.Format("{0:##}", (count1 / max_ore * 100) / 7) & "%"
+                    dr("CO_SECCO") = String.Format("{0:n2}", reader("CO_SECCO"))
+                    dr("CO_AVAIL") = String.Format("{0:##}", (count2 / max_ore * 100) / 7) & "%"
+                    dr("NOX_SECCO") = String.Format("{0:n2}", reader("NOX_SECCO"))
+                    dr("NOX_AVAIL") = String.Format("{0:##}", (count3 / max_ore * 100) / 7) & "%"
+                    dr("POL_SECCO") = String.Format("{0:n2}", reader("POL_SECCO"))
+                    dr("POL_AVAIL") = String.Format("{0:##}", (count4 / max_ore * 100) / 7) & "%"
+                    dr("COV_SECCO") = String.Format("{0:n2}", reader("COV_SECCO"))
+                    dr("COV_AVAIL") = String.Format("{0:##}", (count5 / max_ore * 100) / 7) & "%"
+                    dr("FUMI_SECCO") = String.Format(nfi, "{0:0}", reader("FUMI_SECCO"))
+                    dr("FUMI_AVAIL") = String.Format("{0:##}", (count6 / max_ore * 100) / 7) & "%"
+                    dr("TIPO_DATO") = reader("TIPO_DATO").ToString()
+
+                End If
+
+                dt.Rows.Add(dr)
+                dr = dt.NewRow()
+
+            End While
+
+            dr("ORA") = "Ore Valide"
+            dr("SO2_SECCO") = String.Format("{0:n0}", count1)
+            dr("CO_SECCO") = String.Format("{0:n0}", count2)
+            dr("NOX_SECCO") = String.Format("{0:n0}", count3)
+            dr("POL_SECCO") = String.Format("{0:n0}", count4)
+            dr("COV_SECCO") = String.Format("{0:n0}", count5)
+            dr("FUMI_SECCO") = String.Format("{0:n0}", count6)
+            dt.Rows.Add(dr)
+
+        End If
+
+        Return dt
+
+    End Function
+
+
     Private Sub DateTimePicker1_ValueChanged(sender As Object, e As EventArgs) Handles DateTimePicker1.ValueChanged
 
         Dim startDate = DateTimePicker1.Value
         Dim endDate = DateTimePicker2.Value
 
-        If endDate >= startDate Then
+        If endDate > startDate Then
             Button1.Enabled = True
         Else
             Button1.Enabled = False
@@ -479,7 +856,7 @@ Public Class Form1
         Dim startDate = DateTimePicker1.Value
         Dim endDate = DateTimePicker2.Value
 
-        If endDate >= startDate Then
+        If endDate > startDate Then
             Button1.Enabled = True
         Else
             Button1.Enabled = False
@@ -565,10 +942,9 @@ Public Class Form1
 
     End Sub
 
-    Private Sub downloadReport(ComboStatus As IProgress(Of Integer), startDate As Date, endDate As Date)
+    Private Sub downloadReportFlussi(ComboStatus As IProgress(Of Integer), startDate As Date, endDate As Date)
 
-        'Button2.Enabled = False
-        'Button3.Enabled = False
+
         Dim excel As New Microsoft.Office.Interop.Excel.Application
         Dim wBook As Microsoft.Office.Interop.Excel.Workbook
         Dim wSheet As Microsoft.Office.Interop.Excel.Worksheet
@@ -590,7 +966,7 @@ Public Class Form1
                 d2 = New Date(2020, mesenh3, 1)
         End Select
 
-        'excel.DisplayAlerts = False
+        ComboStatus.Report(State.DataLoading)
         System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.CreateSpecificCulture("en-US")
 
         If (startDate >= d2) Then
@@ -659,6 +1035,7 @@ Public Class Form1
         ' Prima tabella (parte esterna e bordi, non inserisce dati)
         wSheet.Cells(11, 2) = "Giorno"
 
+        ComboStatus.Report(State.TableLoading)
         For i = 0 To dgv.Rows.Count - 1
             Dim currentRow As DataGridViewRow = dgv.Rows(i)
             Dim rowIndex As Integer = i + 11
@@ -729,7 +1106,6 @@ Public Class Form1
                     .VerticalAlignment = -4108
                 End With
             Next
-
             ' Popolamento delle celle nella seconda tabella
             For kk = 2 To quit
                 Dim cellValue As String = If(currentRow.Cells(kk).Value IsNot Nothing, currentRow.Cells(kk).Value.ToString(), String.Empty)
@@ -846,7 +1222,7 @@ Public Class Form1
             Next
         End If
 
-        ComboStatus.Report(State.CaricamentoFogli)
+        ComboStatus.Report(State.SheetLoading)
         For ep = 0 To dgv.Rows.Count - 1
             ' Ottieni la riga corrente usando l'indice ep
             Dim currentRow As DataGridViewRow = dgv.Rows(ep)
@@ -1069,6 +1445,300 @@ Public Class Form1
 
     End Sub
 
+    Private Sub downloadReportBolla(ComboStatus As IProgress(Of Integer), startDate As Date, endDate As Date)
+
+        Dim excel As New Microsoft.Office.Interop.Excel.Application
+        Dim wBook As Microsoft.Office.Interop.Excel.Workbook
+        Dim wSheet As Microsoft.Office.Interop.Excel.Worksheet
+        Dim exePath As String = Application.StartupPath
+        Dim rootPath As String = Directory.GetParent(Directory.GetParent(exePath).FullName).FullName
+        Dim reportTitle As String = ""
+        Dim d2 As Date = New Date(2020, 1, 1)
+
+        If (startDate >= d2) Then
+
+            wBook = excel.Workbooks.Open(Path.Combine(rootPath, "template", "BAT_152_GIORNO_BOLLA_CAMINI.xls"))
+        Else
+
+            wBook = excel.Workbooks.Open(Path.Combine(rootPath, "template", "152_GIORNO_BOLLA_CAMINI.xls"))
+
+        End If
+
+        ComboStatus.Report(State.DataLoading)
+        System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.CreateSpecificCulture("en-US")
+
+
+
+
+
+        wSheet = wBook.ActiveSheet()
+
+        
+
+        Select Case reportType
+            Case 0
+                wSheet.Range("NomeTabella").Value = "152 CONCENTRAZIONI ANNUALE CAMINI DI RAFFINERIA"
+                wSheet.Range("IntervalloDate").Value = "Report Annuale dell'anno " + String.Format(New CultureInfo("it-IT", False), "{0:yyyy}", DateTime.Parse(startDate, New CultureInfo("it-IT", False)))
+                wSheet.Cells(2, 8).Value = "MESE"
+                reportTitle = "152_BOLLA_ANNO" & startDate.Year.ToString()
+            Case 1
+                ' TODO
+            Case 2
+                ' TODO
+        End Select
+
+
+
+        wSheet.Range("NomeTabella").Font.Bold = True
+        wSheet.Range("NomeCentrale").Value = "ENI R&M Taranto " ' " & MySharedMethod.GetChimneyName(Convert.ToInt16(Sezione.Text.ToString()))
+        wSheet.Range("NomeCentrale").Font.Bold = True
+        wSheet.Range("SisMisura").Value = "Sistema di Monitoraggio delle Emissioni"
+        wSheet.Range("SisMisura").Font.Bold = True
+        wSheet.Range("TitoloTabella").Value = reportTitle
+        wSheet.Range("TitoloTabella").Font.Bold = True
+
+        Dim i As Integer
+        Dim z As Integer
+        Dim insert_tab As Integer
+        Dim cc As Integer
+        Dim kk As Integer
+        Dim app As String
+        Dim col As Integer
+        Dim tabcounter As Integer
+        Dim colgv As Integer
+        cc = 11
+
+        ' Inserisci le righe nel foglio di lavoro Excel
+        ' Inserimento righe per la prima tabella
+        For i = 0 To dgv.Rows.Count - 1 - 5 ' Escludi righe VLE, superi, Max e Min
+            wSheet.Rows(cc + i).Insert()
+        Next
+
+        ' Imposta "Giorno" nella cella specificata
+        wSheet.Cells(i + 10, 2) = "Giorno"
+
+        ComboStatus.Report(State.TableLoading)
+        ' Popolazione della prima tabella
+        For i = 0 To dgv.Rows.Count - 1 - 5
+            dgv.ClearSelection()
+            dgv.Rows(i).Selected = True ' Seleziona la riga corrente
+
+            app = "B" & i + 11 & ":N" & i + 11
+            wSheet.Range(app).NumberFormat = "@"
+            wSheet.Range(app).BorderAround()
+
+            app = "C" & i + 11
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+
+            app = "D" & i + 11
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+
+            app = "E" & i + 11
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+
+            app = "F" & i + 11
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+
+            app = "G" & i + 11
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+
+            app = "H" & i + 11
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+
+            app = "I" & i + 11
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+
+            app = "J" & i + 11
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+
+            app = "K" & i + 11
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+
+            app = "L" & i + 11
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+
+            app = "M" & i + 11
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+
+            app = "N" & i + 11
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+
+            For kk = 2 To 14
+                If dgv.Rows(i).Cells(kk).Value.ToString() = "&nbsp;" Then
+                    wSheet.Cells(i + 11, kk) = ""
+                Else
+                    If i = 2 Then ' ORA
+                        wSheet.Cells(i + 11, kk) = String.Format("{0:HH.mm}", dgv.Rows(i).Cells(kk).Value)
+                    Else
+                        wSheet.Cells(i + 11, kk) = dgv.Rows(i).Cells(kk).Value.ToString()
+                    End If
+                End If
+            Next
+        Next
+
+        ComboStatus.Report(State.SheetLoading)
+        Dim cellOffset As Integer = 11 + 2
+
+        ' Seconda parte del ciclo per la popolazione della prima tabella
+        For i = Math.Max(dgv.Rows.Count, 0) To dgv.Rows.Count - 1
+            dgv.ClearSelection()
+            dgv.Rows(i).Selected = True ' Seleziona la riga corrente
+
+            app = "B" & i + cellOffset
+            wSheet.Range(app).BorderAround()
+
+            app = "C" & i + cellOffset & ":D" & i + cellOffset
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).Merge()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+
+            app = "E" & i + cellOffset & ":F" & i + cellOffset
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).Merge()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+
+            app = "G" & i + cellOffset & ":H" & i + cellOffset
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).Merge()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+
+            app = "I" & i + cellOffset & ":J" & i + cellOffset
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).Merge()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+
+            app = "K" & i + cellOffset & ":L" & i + cellOffset
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).Merge()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+
+            app = "M" & i + cellOffset & ":N" & i + cellOffset
+            wSheet.Range(app).BorderAround()
+            wSheet.Range(app).Merge()
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+
+            For kk = 2 To 14
+                If dgv.Rows(i).Cells(kk).Value.ToString() = "&nbsp;" Then
+                    wSheet.Cells(i + cellOffset, kk) = ""
+                Else
+                    If i = 2 Then ' ORA
+                        wSheet.Cells(i + cellOffset, kk) = String.Format("{0:HH.mm}", dgv.Rows(i).Cells(kk).Value)
+                    Else
+                        wSheet.Cells(i + cellOffset, kk) = dgv.Rows(i).Cells(kk).Value.ToString()
+                    End If
+                End If
+            Next
+        Next
+
+        ' Popolazione della seconda tabella
+        col = 2
+        insert_tab = i + cc + 4
+
+        For z = 0 To dgv2.Rows.Count - 1
+            dgv2.ClearSelection()
+            dgv2.Rows(z).Selected = True ' Seleziona la riga corrente
+
+            colgv = 1
+            For tabcounter = 2 To dgv2.Columns.Count
+                If dgv2.Rows(z).Cells(tabcounter - 1).Value.ToString() = "&nbsp;" Then
+                    wSheet.Cells(insert_tab, colgv) = ""
+                Else
+                    wSheet.Cells(insert_tab, colgv) = dgv2.Rows(z).Cells(tabcounter - 1).Value.ToString()
+                End If
+                colgv += 1
+            Next
+
+            insert_tab += 1
+            col += 1
+        Next
+
+        dgv2.ClearSelection() ' Deseleziona eventuali righe selezionate
+
+
+        excel.DisplayAlerts = False
+        Dim reportFileXls = reportTitle & ".xls"
+        Dim reportFilePdf = reportTitle & ".pdf"
+        Dim reportPath = Path.Combine(rootPath, "report", reportFileXls)
+        Dim reportPathPdf = Path.Combine(rootPath, "report", reportFilePdf)
+        excel.DisplayAlerts = False
+        wBook.SaveAs(reportPath, Microsoft.Office.Interop.Excel.XlFileFormat.xlWorkbookNormal, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, Microsoft.Office.Interop.Excel.XlSaveAsAccessMode.xlNoChange)
+        wSheet.PageSetup.PrintArea = "A1:Z60"
+        wSheet.PageSetup.PaperSize = Microsoft.Office.Interop.Excel.XlPaperSize.xlPaperA4
+        wSheet.PageSetup.Orientation = Microsoft.Office.Interop.Excel.XlPageOrientation.xlLandscape
+        wSheet.ExportAsFixedFormat(Microsoft.Office.Interop.Excel.XlFixedFormatType.xlTypePDF, reportPathPdf, Quality:=Microsoft.Office.Interop.Excel.XlFixedFormatQuality.xlQualityStandard, _
+                    IncludeDocProperties:=True, IgnorePrintAreas:=False, _
+                    OpenAfterPublish:=False)
+        ComboStatus.Report(State.FinishedReport)
+        If (startDate = endDate) Then
+            wBook.Close()
+            excel.DisplayAlerts = True
+            excel.Quit()
+
+            Marshal.ReleaseComObject(wSheet)
+            Marshal.ReleaseComObject(wBook)
+
+            Marshal.ReleaseComObject(excel)
+            wSheet = Nothing
+            wBook = Nothing
+            excel = Nothing
+            MySharedMethod.KillAllExcels()
+            System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.CreateSpecificCulture("it-IT")
+            ComboStatus.Report(State.Finished)
+            ShowCompletionDialog()
+        End If
+
+    End Sub
+
+
+    Private Sub DisableForm()
+
+        For Each ctrl As Control In Controls
+            If (Not ctrl.Equals(dgv) And (Not ctrl.Name = ProgressBar1.Name Or Not ctrl.Name = TextBox1.Name)) Then
+                ctrl.Enabled = False
+            End If
+        Next
+
+    End Sub
+
+    Private Sub EnableForm()
+
+        For Each ctrl As Control In Controls
+            If Not ctrl.Equals(dgv) And ctrl.Enabled = False Then
+                ctrl.Enabled = True
+            End If
+        Next
+
+    End Sub
 
     Private Sub ShowCompletionDialog()
         ' Crea un'istanza del form modale
