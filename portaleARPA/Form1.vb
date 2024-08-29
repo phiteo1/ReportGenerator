@@ -19,7 +19,7 @@ Public Class Form1
     Dim mesenh3 As Integer = ConfigurationManager.AppSettings("mesenh3")
     Dim hiddenColumns As New List(Of String)()
     Dim d2 As Date
-    Dim bolla As Byte = 255
+    Dim bolla As Byte
     Dim aia As Int32 = 1
 
     Enum State                  'State Machine of the downloading process
@@ -71,6 +71,7 @@ Public Class Form1
                                                                    actualState = State.DataLoading
                                                                Case 2
                                                                    TextBox1.Text = "Table Creation..."
+                                                                   ProgressBar1.Visible = False
                                                                    actualState = State.TableLoading
                                                                Case 3
                                                                    TextBox1.Text = "Sheet Creation..."
@@ -114,13 +115,23 @@ Public Class Form1
                 dataTable2 = Nothing
             End If
 
-            dgv.DataSource = dataTable1                                                                                     'Bind the data to the first DataGridView
-            dgv2.DataSource = dataTable2                                                                                    'Bind the data to the second DataGridView
+            If dataTable1 Is Nothing OrElse dataTable1.Rows.Count = 0 Then
+                MessageBox.Show("Nessun dato restituito o errore nella query", "Avviso", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                Return
+            Else
+                dgv.DataSource = dataTable1                                                                                     'Bind the data to the first DataGridView
+            End If
+            If dataTable2 Is Nothing OrElse dataTable2.Rows.Count = 0 Then
+                MessageBox.Show("Nessun dato restituito o errore nella query.", "Avviso", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                Return
+            Else
+                dgv2.DataSource = dataTable2                                                                                    'Bind the data to the second DataGridView
+            End If
+
             dgv.Visible = True
             dgv.Visible = False                                                                                             'Dont' worry about that. It's an hack to get the correct number of rows
             dgv2.Visible = True
             dgv2.Visible = False
-            ProgressBar1.Visible = False
             TextBox1.Visible = True
 
             If bolla = 0 Then
@@ -210,6 +221,7 @@ Public Class Form1
                 datanh3 = "01/01/2020"
         End Select
 
+        progress.Report(State.DataLoading)
         dt.Columns.Add(New Data.DataColumn("IDX_REPORT", GetType(Double)))
         dt.Columns.Add(New Data.DataColumn("INS_ORDER", GetType(Integer)))
         dt.Columns.Add(New Data.DataColumn("ORA", GetType(String)))
@@ -290,16 +302,21 @@ Public Class Form1
             testCMD.Parameters("@TIPO_ESTRAZIONE").Value = reportType
             testCMD.Parameters.Add("@retval", Data.SqlDbType.Int)
             testCMD.Parameters("@retval").Direction = Data.ParameterDirection.Output
+            Try
+                testCMD.ExecuteScalar()
+                ret = testCMD.Parameters("@retval").Value
+                queryNumber += 3
+                progress.Report(queryNumber * progressStep)
 
-            testCMD.ExecuteScalar()
-            ret = testCMD.Parameters("@retval").Value
-            queryNumber += 3
-            progress.Report(queryNumber * progressStep)
+                testCMD.Parameters("@idsez").Value = 1
+                testCMD.ExecuteScalar()
 
-            testCMD.Parameters("@idsez").Value = 1
-            testCMD.ExecuteScalar()
-
-            ret2 = testCMD.Parameters("@retval").Value
+                ret2 = testCMD.Parameters("@retval").Value
+            Catch ex As Exception
+                Console.WriteLine("Errore durante l'esecuzione della stored procedure: " & ex.Message, "Errore SQL")
+                Return dt
+            End Try
+            
             dataType = " AND TIPO_DATO IS NULL ORDER BY INS_ORDER"
 
         End If
@@ -307,171 +324,182 @@ Public Class Form1
 
         Dim logStatement As String = "SELECT * FROM [ARPA_WEB_MASSICI_CAMINI] WHERE IDX_REPORT = " & ret.ToString() & dataType
         command = New System.Data.SqlClient.SqlCommand(logStatement, connection)
-
-        reader = command.ExecuteReader()
-        logStatement = "SELECT * FROM [ARPA_WEB_MASSICI_CAMINI] WHERE IDX_REPORT = " & ret2.ToString() & dataType
-        command2 = New System.Data.SqlClient.SqlCommand(logStatement, connection2)
         Dim reader2 As System.Data.SqlClient.SqlDataReader
-        reader2 = command2.ExecuteReader()
+        Try
+            reader = command.ExecuteReader()
+            logStatement = "SELECT * FROM [ARPA_WEB_MASSICI_CAMINI] WHERE IDX_REPORT = " & ret2.ToString() & dataType
+            command2 = New System.Data.SqlClient.SqlCommand(logStatement, connection2)
+            reader2 = command2.ExecuteReader()
+
+        Catch ex As SqlException
+            Console.WriteLine("Errore durante l'esecuzione della query: " & ex.Message, "Errore SQL")
+            Return dt
+
+        End Try
+
         Dim dr As Data.DataRow = dt.NewRow()
+
         If (reader.HasRows) Then
             While reader.Read()
-                reader2.Read()
-                dr("IDX_REPORT") = reader("IDX_REPORT")
-                dr("INS_ORDER") = String.Format("{0:n0}", reader("INS_ORDER"))
-                dr("ORA") = reader("ORA") 'String.Format("{0:n2}", reader("NOX"))
-
-                dr("E1Q_NOX") = reader("E1Q_NOX")
-                dr("E1Q_SO2") = reader("E1Q_SO2")
-                dr("E1Q_POLVERI") = reader("E1Q_POLVERI")
-                dr("E1Q_CO") = reader("E1Q_CO")
-                dr("E1Q_COV") = reader("E1Q_COV")
-
-                dr("E2Q_NOX") = reader("E2Q_NOX")
-                dr("E2Q_SO2") = reader("E2Q_SO2")
-                dr("E2Q_POLVERI") = reader("E2Q_POLVERI")
-                dr("E2Q_CO") = reader("E2Q_CO")
-                dr("E2Q_COV") = reader("E2Q_COV")
-
                 Try
-                    dr("E3Q_NOX") = String.Format(culture, "{0:n2}", Double.Parse(reader2("E1Q_NOX"), culture.NumberFormat))
-                Catch e As FormatException         ''il dato non è un double
-                    dr("E3Q_NOX") = reader2("E1Q_NOX")
-                Catch e As Exception When TypeOf e Is InvalidOperationException OrElse TypeOf e Is InvalidCastException ''non c'è il dato per E3
-                    dr("E3Q_NOX") = "--"
-                End Try
+                    reader2.Read()
+                    dr("IDX_REPORT") = reader("IDX_REPORT")
+                    dr("INS_ORDER") = String.Format("{0:n0}", reader("INS_ORDER"))
+                    dr("ORA") = reader("ORA") 'String.Format("{0:n2}", reader("NOX"))
 
-                Try
-                    dr("E3Q_SO2") = String.Format(culture, "{0:n2}", Double.Parse(reader2("E1Q_SO2"), culture.NumberFormat))
-                Catch e As FormatException
-                    dr("E3Q_SO2") = reader2("E1Q_SO2")
-                Catch e As Exception When TypeOf e Is InvalidOperationException OrElse TypeOf e Is InvalidCastException     ''non c'è il dato per E3
-                    dr("E3Q_SO2") = "--"
-                End Try
+                    dr("E1Q_NOX") = reader("E1Q_NOX")
+                    dr("E1Q_SO2") = reader("E1Q_SO2")
+                    dr("E1Q_POLVERI") = reader("E1Q_POLVERI")
+                    dr("E1Q_CO") = reader("E1Q_CO")
+                    dr("E1Q_COV") = reader("E1Q_COV")
 
-                Try
-                    dr("E3Q_POLVERI") = String.Format(culture, "{0:n2}", Double.Parse(reader2("E1Q_POLVERI"), culture.NumberFormat))
-                Catch e As FormatException
-                    dr("E3Q_POLVERI") = reader2("E1Q_POLVERI")
-                Catch e As Exception When TypeOf e Is InvalidOperationException OrElse TypeOf e Is InvalidCastException     ''non c'è il dato per E3
-                    dr("E3Q_POLVERI") = "--"
-                End Try
+                    dr("E2Q_NOX") = reader("E2Q_NOX")
+                    dr("E2Q_SO2") = reader("E2Q_SO2")
+                    dr("E2Q_POLVERI") = reader("E2Q_POLVERI")
+                    dr("E2Q_CO") = reader("E2Q_CO")
+                    dr("E2Q_COV") = reader("E2Q_COV")
 
-                Try
-                    dr("E3Q_CO") = String.Format(culture, "{0:n2}", Double.Parse(reader2("E1Q_CO"), culture.NumberFormat))
-                Catch e As FormatException         ''il dato non è un double
-                    dr("E3Q_CO") = reader2("E1Q_CO")
-                Catch e As Exception When TypeOf e Is InvalidOperationException OrElse TypeOf e Is InvalidCastException ''non c'è il dato per E3
-                    dr("E3Q_CO") = "--"
-                End Try
+                    Try
+                        dr("E3Q_NOX") = String.Format(culture, "{0:n2}", Double.Parse(reader2("E1Q_NOX"), culture.NumberFormat))
+                    Catch e As FormatException         ''il dato non è un double
+                        dr("E3Q_NOX") = reader2("E1Q_NOX")
+                    Catch e As Exception When TypeOf e Is InvalidOperationException OrElse TypeOf e Is InvalidCastException ''non c'è il dato per E3
+                        dr("E3Q_NOX") = "--"
+                    End Try
 
+                    Try
+                        dr("E3Q_SO2") = String.Format(culture, "{0:n2}", Double.Parse(reader2("E1Q_SO2"), culture.NumberFormat))
+                    Catch e As FormatException
+                        dr("E3Q_SO2") = reader2("E1Q_SO2")
+                    Catch e As Exception When TypeOf e Is InvalidOperationException OrElse TypeOf e Is InvalidCastException     ''non c'è il dato per E3
+                        dr("E3Q_SO2") = "--"
+                    End Try
 
-                Try
-                    dr("E3Q_COV") = String.Format(culture, "{0:n2}", Double.Parse(reader2("E1Q_COV"), culture.NumberFormat))
-                Catch e As FormatException         ''il dato non è un double
-                    dr("E3Q_COV") = reader2("E1Q_COV")
-                Catch e As Exception When TypeOf e Is InvalidOperationException OrElse TypeOf e Is InvalidCastException ''non c'è il dato per E3
-                    dr("E3Q_COV") = "--"
-                End Try
+                    Try
+                        dr("E3Q_POLVERI") = String.Format(culture, "{0:n2}", Double.Parse(reader2("E1Q_POLVERI"), culture.NumberFormat))
+                    Catch e As FormatException
+                        dr("E3Q_POLVERI") = reader2("E1Q_POLVERI")
+                    Catch e As Exception When TypeOf e Is InvalidOperationException OrElse TypeOf e Is InvalidCastException     ''non c'è il dato per E3
+                        dr("E3Q_POLVERI") = "--"
+                    End Try
 
+                    Try
+                        dr("E3Q_CO") = String.Format(culture, "{0:n2}", Double.Parse(reader2("E1Q_CO"), culture.NumberFormat))
+                    Catch e As FormatException         ''il dato non è un double
+                        dr("E3Q_CO") = reader2("E1Q_CO")
+                    Catch e As Exception When TypeOf e Is InvalidOperationException OrElse TypeOf e Is InvalidCastException ''non c'è il dato per E3
+                        dr("E3Q_CO") = "--"
+                    End Try
 
-                dr("E4Q_NOX") = reader("E4Q_NOX")
-                dr("E4Q_SO2") = reader("E4Q_SO2")
-                dr("E4Q_POLVERI") = reader("E4Q_POLVERI")
-                dr("E4Q_CO") = reader("E4Q_CO")
-                dr("E4Q_COV") = reader("E4Q_COV")
+                    Try
+                        dr("E3Q_COV") = String.Format(culture, "{0:n2}", Double.Parse(reader2("E1Q_COV"), culture.NumberFormat))
+                    Catch e As FormatException         ''il dato non è un double
+                        dr("E3Q_COV") = reader2("E1Q_COV")
+                    Catch e As Exception When TypeOf e Is InvalidOperationException OrElse TypeOf e Is InvalidCastException ''non c'è il dato per E3
+                        dr("E3Q_COV") = "--"
+                    End Try
 
-                dr("E7Q_NOX") = reader("E7Q_NOX")
-                dr("E7Q_SO2") = reader("E7Q_SO2")
-                dr("E7Q_POLVERI") = reader("E7Q_POLVERI")
-                dr("E7Q_CO") = reader("E7Q_CO")
-                dr("E7Q_COV") = reader("E7Q_COV")
+                    dr("E4Q_NOX") = reader("E4Q_NOX")
+                    dr("E4Q_SO2") = reader("E4Q_SO2")
+                    dr("E4Q_POLVERI") = reader("E4Q_POLVERI")
+                    dr("E4Q_CO") = reader("E4Q_CO")
+                    dr("E4Q_COV") = reader("E4Q_COV")
 
-                dr("E8Q_NOX") = reader("E8Q_NOX")
-                dr("E8Q_SO2") = reader("E8Q_SO2")
-                dr("E8Q_POLVERI") = reader("E8Q_POLVERI")
-                dr("E8Q_CO") = reader("E8Q_CO")
-                dr("E8Q_COV") = reader("E8Q_COV")
+                    dr("E7Q_NOX") = reader("E7Q_NOX")
+                    dr("E7Q_SO2") = reader("E7Q_SO2")
+                    dr("E7Q_POLVERI") = reader("E7Q_POLVERI")
+                    dr("E7Q_CO") = reader("E7Q_CO")
+                    dr("E7Q_COV") = reader("E7Q_COV")
 
-                dr("E9Q_NOX") = reader("E9Q_NOX")
-                dr("E9Q_SO2") = reader("E9Q_SO2")
-                dr("E9Q_POLVERI") = reader("E9Q_POLVERI")
-                dr("E9Q_CO") = reader("E9Q_CO")
-                dr("E9Q_COV") = reader("E9Q_COV")
-                If (reader("E9Q_NH3") IsNot DBNull.Value) Then
-                    dr("E9Q_NH3") = reader("E9Q_NH3")
-                Else
-                    dr("E9Q_NH3") = "0"
-                End If
+                    dr("E8Q_NOX") = reader("E8Q_NOX")
+                    dr("E8Q_SO2") = reader("E8Q_SO2")
+                    dr("E8Q_POLVERI") = reader("E8Q_POLVERI")
+                    dr("E8Q_CO") = reader("E8Q_CO")
+                    dr("E8Q_COV") = reader("E8Q_COV")
 
-                dr("E10Q_NOX") = reader("E10Q_NOX")
-                dr("E10Q_SO2") = reader("E10Q_SO2")
-                dr("E10Q_POLVERI") = reader("E10Q_POLVERI")
-                dr("E10Q_CO") = reader("E10Q_CO")
-                dr("E10Q_COV") = reader("E10Q_COV")
-
-                If whatTable = 1 Then
-                    dr("NOX_SOMMA") = reader("NOX_SOMMA")
-                    dr("SO2_SOMMA") = reader("SO2_SOMMA")
-                    dr("POLVERI_SOMMA") = reader("POLVERI_SOMMA")
-                    dr("CO_SOMMA") = reader("CO_SOMMA")
-
-
-                    dr("COV_SOMMA") = reader("COV_SOMMA")
-                    dr("NH3_SOMMA") = reader("NH3_SOMMA")
-                    dr("NOX57_SOMMA") = reader("NOX57_SOMMA")
-
-                Else
-                    If (reader("TIPO_DATO").ToString().Contains("DISP")) Then
-                        For i As Integer = 3 To dr.Table.Columns.Count - 1 Step 1
-                            dr(i) = String.Format(culture, "{0:P2}", Double.Parse(dr(i), culture.NumberFormat))
-                        Next
-                    ElseIf (reader("TIPO_DATO").ToString().Contains("AVG") Or reader("TIPO_DATO").ToString().Contains("Totale")) Then
-                        For i As Integer = 3 To dr.Table.Columns.Count - 1 Step 1
-                            dr(i) = String.Format(culture, "{0:n2}", Double.Parse(dr(i), culture.NumberFormat))
-                        Next
-                    ElseIf (reader("TIPO_DATO").ToString().Contains("N.F.") Or reader("TIPO_DATO").ToString().Contains("VALIDITA")) Then
-                        For i As Integer = 3 To dr.Table.Columns.Count - 1 Step 1
-                            dr(i) = String.Format(culture, "{0:n0}", Double.Parse(dr(i), culture.NumberFormat))
-                        Next
+                    dr("E9Q_NOX") = reader("E9Q_NOX")
+                    dr("E9Q_SO2") = reader("E9Q_SO2")
+                    dr("E9Q_POLVERI") = reader("E9Q_POLVERI")
+                    dr("E9Q_CO") = reader("E9Q_CO")
+                    dr("E9Q_COV") = reader("E9Q_COV")
+                    If (reader("E9Q_NH3") IsNot DBNull.Value) Then
+                        dr("E9Q_NH3") = reader("E9Q_NH3")
+                    Else
+                        dr("E9Q_NH3") = "0"
                     End If
 
-                End If
+                    dr("E10Q_NOX") = reader("E10Q_NOX")
+                    dr("E10Q_SO2") = reader("E10Q_SO2")
+                    dr("E10Q_POLVERI") = reader("E10Q_POLVERI")
+                    dr("E10Q_CO") = reader("E10Q_CO")
+                    dr("E10Q_COV") = reader("E10Q_COV")
 
-
-                dt.Rows.Add(dr)
-                dr = dt.NewRow()
-
-
-                If (startTime < Date.Parse(datanh3)) Then
-                    hiddenColumns.Add("E9Q_NH3")
                     If whatTable = 1 Then
-                        hiddenColumns.Add("NH3_SOMMA")
-                        hiddenColumns.Add("NOX57_SOMMA")
-                    End If
-                End If
-
-
-                For Each column As DataGridViewColumn In dgv.Columns
-                    ' Verifica se il nome della colonna è nella lista delle colonne nascoste
-                    If hiddenColumns.Contains(column.DataPropertyName) Then
-                        column.Visible = False
-                    End If
-                Next
-
-                If hiddenColumns.Count = 0 Then
-                    For Each column As DataGridViewColumn In dgv.Columns
-                        ' Verifica se il nome della colonna corrisponde ai nomi specificati
-                        If column.DataPropertyName = "E9Q_NH3" Or column.DataPropertyName = "NH3_SOMMA" Or column.DataPropertyName = "NOX57_SOMMA" Then
-                            column.Visible = True
+                        dr("NOX_SOMMA") = reader("NOX_SOMMA")
+                        dr("SO2_SOMMA") = reader("SO2_SOMMA")
+                        dr("POLVERI_SOMMA") = reader("POLVERI_SOMMA")
+                        dr("CO_SOMMA") = reader("CO_SOMMA")
+                        dr("COV_SOMMA") = reader("COV_SOMMA")
+                        dr("NH3_SOMMA") = reader("NH3_SOMMA")
+                        dr("NOX57_SOMMA") = reader("NOX57_SOMMA")
+                    Else
+                        If (reader("TIPO_DATO").ToString().Contains("DISP")) Then
+                            For i As Integer = 3 To dr.Table.Columns.Count - 1 Step 1
+                                dr(i) = String.Format(culture, "{0:P2}", Double.Parse(dr(i), culture.NumberFormat))
+                            Next
+                        ElseIf (reader("TIPO_DATO").ToString().Contains("AVG") Or reader("TIPO_DATO").ToString().Contains("Totale")) Then
+                            For i As Integer = 3 To dr.Table.Columns.Count - 1 Step 1
+                                dr(i) = String.Format(culture, "{0:n2}", Double.Parse(dr(i), culture.NumberFormat))
+                            Next
+                        ElseIf (reader("TIPO_DATO").ToString().Contains("N.F.") Or reader("TIPO_DATO").ToString().Contains("VALIDITA")) Then
+                            For i As Integer = 3 To dr.Table.Columns.Count - 1 Step 1
+                                dr(i) = String.Format(culture, "{0:n0}", Double.Parse(dr(i), culture.NumberFormat))
+                            Next
                         End If
-                    Next
-                End If
+                    End If
+
+                    dt.Rows.Add(dr)
+                    dr = dt.NewRow()
+
+                Catch ex As Exception
+                    Console.WriteLine("Errore nella lettura dei dati: " & ex.Message)
+                    Continue While
+                End Try
+
             End While
 
             queryNumber += 1
             progress.Report(queryNumber * progressStep)
 
+        End If
+
+
+
+            
+
+        If (startTime < Date.Parse(datanh3)) Then
+            hiddenColumns.Add("E9Q_NH3")
+            If whatTable = 1 Then
+                hiddenColumns.Add("NH3_SOMMA")
+                hiddenColumns.Add("NOX57_SOMMA")
+            End If
+        End If
+
+
+        For Each column As DataGridViewColumn In dgv.Columns
+            ' Verifica se il nome della colonna è nella lista delle colonne nascoste
+            If hiddenColumns.Contains(column.DataPropertyName) Then
+                column.Visible = False
+            End If
+        Next
+
+        If hiddenColumns.Count = 0 Then
+            For Each column As DataGridViewColumn In dgv.Columns
+                ' Verifica se il nome della colonna corrisponde ai nomi specificati
+                If column.DataPropertyName = "E9Q_NH3" Or column.DataPropertyName = "NH3_SOMMA" Or column.DataPropertyName = "NOX57_SOMMA" Then
+                    column.Visible = True
+                End If
+            Next
         End If
 
         connection.Close()
@@ -480,9 +508,20 @@ Public Class Form1
         If whatTable = 2 Then
             connection2.Open()
             logStatement = "DELETE FROM ARPA_WEB_MASSICI_CAMINI"
+
             Using deleteCmd As New SqlCommand(logStatement, connection2)
-                deleteCmd.ExecuteNonQuery()
+
+                Try
+                    deleteCmd.ExecuteNonQuery()
+
+                Catch ex As SqlException
+
+                    Console.WriteLine("Errore durante l'esecuzione della query: " & ex.Message, "Errore SQL")
+
+                End Try
+
             End Using
+
             connection2.Close()
         End If
 
@@ -511,6 +550,7 @@ Public Class Form1
             Return dt
         End Try
 
+        progress.Report(State.DataLoading)
         dt.Columns.Add(New Data.DataColumn("IDX_REPORT", GetType(Double)))
         dt.Columns.Add(New Data.DataColumn("INS_ORDER", GetType(Integer)))
         dt.Columns.Add(New Data.DataColumn("ORA", GetType(String)))
@@ -564,7 +604,12 @@ Public Class Form1
         testCMD.Parameters("@TIPO_ESTRAZIONE").Value = reportType
         testCMD.Parameters.Add("@retval", Data.SqlDbType.Int)
         testCMD.Parameters("@retval").Direction = Data.ParameterDirection.Output
-        testCMD.ExecuteScalar()
+        Try
+            testCMD.ExecuteScalar()
+        Catch ex As SqlException
+            Console.WriteLine("Errore durante l'esecuzione della store procedure: " & ex.Message, "Errore SQL")
+        End Try
+
         ret = testCMD.Parameters("@retval").Value
 
         queryNumber += 1
@@ -574,103 +619,117 @@ Public Class Form1
         Dim logStatement As String = "SELECT * FROM [ARPA_WEB_CONCENTRAZIONI_CAMINI] WHERE IDX_REPORT = " & ret.ToString() & "  ORDER BY INS_ORDER"
         command = New System.Data.SqlClient.SqlCommand(logStatement, connection)
 
-        reader = command.ExecuteReader()
+        Try
+            reader = command.ExecuteReader()
+        Catch ex As Exception
+            Console.WriteLine("Errore durante l'esecuzione della query: " & ex.Message, "Errore SQL")
+            Return dt
+        End Try
+
 
         Dim nfi As NumberFormatInfo = New CultureInfo("en-US", False).NumberFormat
         nfi.NumberGroupSeparator = ""
         Dim dr As Data.DataRow = dt.NewRow()
         If (reader.HasRows) Then
             While reader.Read()
-                dr("IDX_REPORT") = reader("IDX_REPORT")
-                dr("INS_ORDER") = String.Format("{0:n0}", reader("INS_ORDER"))
-                If (type = 2) Then
-                    dr("ORA") = String.Format("{0:HH.mm}", reader("ORA")) 'String.Format("{0:n2}", reader("NOX"))
-                ElseIf (type = 1) Then
-                    dr("ORA") = String.Format("{0:dd}", reader("ORA"))
-                Else
-                    dr("ORA") = String.Format("{0:MMMM}", reader("ORA"))
-                End If
+                Try
+                    dr("IDX_REPORT") = reader("IDX_REPORT")
+                    dr("INS_ORDER") = String.Format("{0:n0}", reader("INS_ORDER"))
+                    If (type = 2) Then
+                        dr("ORA") = String.Format("{0:HH.mm}", reader("ORA")) 'String.Format("{0:n2}", reader("NOX"))
+                    ElseIf (type = 1) Then
+                        dr("ORA") = String.Format("{0:dd}", reader("ORA"))
+                    Else
+                        dr("ORA") = String.Format("{0:MMMM}", reader("ORA"))
+                    End If
 
-                ''Quando comincio a leggere i dati riassuntivi inserisco una riga vuota
-                If reader("TIPO_DATO").ToString().Contains("AVG") Then          ''Il valore di media non va nello specchietto subito sotto alla tabella principale, non in fondo alla tabella                    
+                    ''Quando comincio a leggere i dati riassuntivi inserisco una riga vuota
+                    If reader("TIPO_DATO").ToString().Contains("AVG") Then          ''Il valore di media non va nello specchietto subito sotto alla tabella principale, non in fondo alla tabella                    
+                        Continue While
+                    ElseIf (reader("TIPO_DATO").ToString().Contains("MAX")) Then    '' I valori di massimo e minimo vanno in fondo alla prima tabella (v. pre_render)
+                        dr("ORA") = "MAX"
+                    ElseIf (reader("TIPO_DATO").ToString().Contains("SUPERI")) Then
+                        dr("ORA") = "N Sup. Medie Giorn."
+                    ElseIf (reader("TIPO_DATO").ToString().Contains("MIN")) Then
+                        dr("ORA") = "MIN"
+                    ElseIf (reader("TIPO_DATO").ToString().Contains("VLE")) Then
+                        dt.Rows.Add()
+                        dr("ORA") = "VLE"
+                    ElseIf (reader("TIPO_DATO").ToString() = "") Then               ''Se il valore è NULL vuol dire che sto leggendo un dato giornaliero, quindi non devo fare nulla di particolare
+
+                    Else                                                            ''Negli altri casi ho raggiunto la fine della Tabella SQL con i dati di interesse e quindi esco senza scrivere altro
+                        Exit While
+                    End If
+
+                    Dim availability As Double
+                    dr("SO2_SECCO") = String.Format("{0:n2}", reader("SO2_SECCO"))
+                    dr("SO2_AVAIL") = String.Format("{0:0.00}", reader("SO2_AVAIL")) & "%"
+                    If (Double.TryParse(reader("SO2_AVAIL").ToString, availability)) Then
+                        If (availability < 70) Then
+                            dr("SO2_SECCO") = dr("SO2_SECCO") + "(*)"
+                        End If
+                    End If
+
+
+                    dr("CO_SECCO") = String.Format("{0:n2}", reader("CO_SECCO"))
+                    dr("CO_AVAIL") = String.Format("{0:0.00}", reader("CO_AVAIL")) & "%"
+                    If (Double.TryParse(reader("CO_AVAIL").ToString, availability)) Then
+                        If (availability < 70) Then
+                            dr("CO_SECCO") = dr("CO_SECCO") + "(*)"
+                        End If
+                    End If
+
+                    dr("NOX_SECCO") = String.Format("{0:n2}", reader("NOX_SECCO"))
+                    dr("NOX_AVAIL") = String.Format("{0:0.00}", reader("NOX_AVAIL")) & "%"
+                    If (Double.TryParse(reader("NOX_AVAIL").ToString, availability)) Then
+                        If (availability < 70) Then
+                            dr("NOX_SECCO") = dr("NOX_SECCO") + "(*)"
+                        End If
+                    End If
+
+                    dr("POL_SECCO") = String.Format("{0:n2}", reader("POL_SECCO"))
+                    dr("POL_AVAIL") = String.Format("{0:0.00}", reader("POL_AVAIL")) & "%"
+                    If (Double.TryParse(reader("POL_AVAIL").ToString, availability)) Then
+                        If (availability < 70) Then
+                            dr("POL_SECCO") = dr("POL_SECCO") + "(*)"
+                        End If
+                    End If
+
+                    dr("COV_SECCO") = String.Format("{0:n2}", reader("COV_SECCO"))
+                    dr("COV_AVAIL") = String.Format("{0:0.00}", reader("COV_AVAIL")) & "%"
+                    If (Double.TryParse(reader("COV_AVAIL").ToString, availability)) Then
+                        If (availability < 70) Then
+                            dr("COV_SECCO") = dr("COV_SECCO") + "(*)"
+                        End If
+                    End If
+
+                    dr("FUMI_SECCO") = String.Format(nfi, "{0:n2}", reader("FUMI_SECCO"))
+                    dr("FUMI_AVAIL") = String.Format("{0:0.00}", reader("FUMI_AVAIL")) & "%"
+                    If (Double.TryParse(reader("FUMI_AVAIL").ToString, availability)) Then
+                        If (availability < 70) Then
+                            dr("FUMI_SECCO") = dr("FUMI_SECCO") + "(*)"
+                        End If
+                    End If
+
+                    If (reader("TIPO_DATO").ToString().Contains("VLE")) Then
+                        dr("FUMI_SECCO") = "-"
+                    End If
+
+                    If (reader("TIPO_DATO").ToString().Contains("SUPERI")) Then
+                        dr("SO2_SECCO") = String.Format("{0:n0}", reader("SO2_SECCO"))
+                    End If
+
+                    dr("TIPO_DATO") = reader("TIPO_DATO").ToString()
+                    dt.Rows.Add(dr)
+                    dr = dt.NewRow()
+
+                Catch ex As Exception
+                    Console.WriteLine("Errore nella lettura dei dati: " & ex.Message)
                     Continue While
-                ElseIf (reader("TIPO_DATO").ToString().Contains("MAX")) Then    '' I valori di massimo e minimo vanno in fondo alla prima tabella (v. pre_render)
-                    dr("ORA") = "MAX"
-                ElseIf (reader("TIPO_DATO").ToString().Contains("SUPERI")) Then
-                    dr("ORA") = "N Sup. Medie Giorn."
-                ElseIf (reader("TIPO_DATO").ToString().Contains("MIN")) Then
-                    dr("ORA") = "MIN"
-                ElseIf (reader("TIPO_DATO").ToString().Contains("VLE")) Then
-                    dt.Rows.Add()
-                    dr("ORA") = "VLE"
-                ElseIf (reader("TIPO_DATO").ToString() = "") Then               ''Se il valore è NULL vuol dire che sto leggendo un dato giornaliero, quindi non devo fare nulla di particolare
+                End Try
 
-                Else                                                            ''Negli altri casi ho raggiunto la fine della Tabella SQL con i dati di interesse e quindi esco senza scrivere altro
-                    Exit While
-                End If
-
-                Dim availability As Double
-                dr("SO2_SECCO") = String.Format("{0:n2}", reader("SO2_SECCO"))
-                dr("SO2_AVAIL") = String.Format("{0:0.00}", reader("SO2_AVAIL")) & "%"
-                If (Double.TryParse(reader("SO2_AVAIL").ToString, availability)) Then
-                    If (availability < 70) Then
-                        dr("SO2_SECCO") = dr("SO2_SECCO") + "(*)"
-                    End If
-                End If
-
-
-                dr("CO_SECCO") = String.Format("{0:n2}", reader("CO_SECCO"))
-                dr("CO_AVAIL") = String.Format("{0:0.00}", reader("CO_AVAIL")) & "%"
-                If (Double.TryParse(reader("CO_AVAIL").ToString, availability)) Then
-                    If (availability < 70) Then
-                        dr("CO_SECCO") = dr("CO_SECCO") + "(*)"
-                    End If
-                End If
-
-                dr("NOX_SECCO") = String.Format("{0:n2}", reader("NOX_SECCO"))
-                dr("NOX_AVAIL") = String.Format("{0:0.00}", reader("NOX_AVAIL")) & "%"
-                If (Double.TryParse(reader("NOX_AVAIL").ToString, availability)) Then
-                    If (availability < 70) Then
-                        dr("NOX_SECCO") = dr("NOX_SECCO") + "(*)"
-                    End If
-                End If
-
-                dr("POL_SECCO") = String.Format("{0:n2}", reader("POL_SECCO"))
-                dr("POL_AVAIL") = String.Format("{0:0.00}", reader("POL_AVAIL")) & "%"
-                If (Double.TryParse(reader("POL_AVAIL").ToString, availability)) Then
-                    If (availability < 70) Then
-                        dr("POL_SECCO") = dr("POL_SECCO") + "(*)"
-                    End If
-                End If
-
-                dr("COV_SECCO") = String.Format("{0:n2}", reader("COV_SECCO"))
-                dr("COV_AVAIL") = String.Format("{0:0.00}", reader("COV_AVAIL")) & "%"
-                If (Double.TryParse(reader("COV_AVAIL").ToString, availability)) Then
-                    If (availability < 70) Then
-                        dr("COV_SECCO") = dr("COV_SECCO") + "(*)"
-                    End If
-                End If
-
-                dr("FUMI_SECCO") = String.Format(nfi, "{0:n2}", reader("FUMI_SECCO"))
-                dr("FUMI_AVAIL") = String.Format("{0:0.00}", reader("FUMI_AVAIL")) & "%"
-                If (Double.TryParse(reader("FUMI_AVAIL").ToString, availability)) Then
-                    If (availability < 70) Then
-                        dr("FUMI_SECCO") = dr("FUMI_SECCO") + "(*)"
-                    End If
-                End If
-
-                If (reader("TIPO_DATO").ToString().Contains("VLE")) Then
-                    dr("FUMI_SECCO") = "-"
-                End If
-
-                If (reader("TIPO_DATO").ToString().Contains("SUPERI")) Then
-                    dr("SO2_SECCO") = String.Format("{0:n0}", reader("SO2_SECCO"))
-                End If
-
-                dr("TIPO_DATO") = reader("TIPO_DATO").ToString()
-                dt.Rows.Add(dr)
-                dr = dt.NewRow()
             End While
+                
         End If
 
 
@@ -691,7 +750,7 @@ Public Class Form1
         Dim reader As System.Data.SqlClient.SqlDataReader
         Dim connection As New SqlConnection(connectionString)
         Dim connection2 As New SqlConnection(connectionString)
-        Dim queryNumber As Integer = 3
+        Dim queryNumber As Integer = 3                                                  'In this case the getData is splitted in two part so the first 3 steps was executed by the first part
         Dim queriesCount As Integer = 4
         Dim progressStep As Integer = 100 \ queriesCount
         Dim aia As Int32 = 1
@@ -707,6 +766,7 @@ Public Class Form1
             Return dt
         End Try
 
+        progress.Report(State.DataLoading)
         dt.Columns.Add(New Data.DataColumn("IDX_REPORT", GetType(Double)))
         dt.Columns.Add(New Data.DataColumn("INS_ORDER", GetType(Integer)))
         dt.Columns.Add(New Data.DataColumn("ORA", GetType(String)))
@@ -731,13 +791,17 @@ Public Class Form1
 
         dt.Columns.Add(New Data.DataColumn("TIPO_DATO", GetType(String)))
 
-        'queryNumber += 1
-        'progress.Report(queryNumber * progressStep)
 
         Dim logStatement As String = "SELECT * FROM [ARPA_WEB_CONCENTRAZIONI_CAMINI] WHERE IDX_REPORT = " & ret.ToString() & dataType
         Dim max_ore As Integer
         command = New System.Data.SqlClient.SqlCommand(logStatement, connection)
-        reader = command.ExecuteReader()
+        Try
+            reader = command.ExecuteReader()
+        Catch ex As SqlException
+            Console.WriteLine("Errore durante l'esecuzione della query: " & ex.Message, "Errore SQL")
+            Return dt
+        End Try
+
 
         If (reader.HasRows) Then
             While reader.Read()
@@ -750,16 +814,28 @@ Public Class Form1
         logStatement = "SELECT * FROM [ARPA_WEB_CONCENTRAZIONI_CAMINI] WHERE IDX_REPORT = " & ret.ToString() & dataType
         Dim count1, count2, count3, count4, count5, count6 As Double
         command = New System.Data.SqlClient.SqlCommand(logStatement, connection)
-        reader = command.ExecuteReader()
+        Try
+            reader = command.ExecuteReader()
+        Catch ex As Exception
+            Console.WriteLine("Errore durante l'esecuzione della query: " & ex.Message, "Errore SQL")
+            Return dt
+        End Try
+
 
         If (reader.HasRows) Then
             While reader.Read()
-                count1 = reader("SO2_SECCO")
-                count2 = reader("CO_SECCO")
-                count3 = reader("NOX_SECCO")
-                count4 = reader("POL_SECCO")
-                count5 = reader("COV_SECCO")
-                count6 = reader("FUMI_SECCO")
+                Try
+                    count1 = reader("SO2_SECCO")
+                    count2 = reader("CO_SECCO")
+                    count3 = reader("NOX_SECCO")
+                    count4 = reader("POL_SECCO")
+                    count5 = reader("COV_SECCO")
+                    count6 = reader("FUMI_SECCO")
+                Catch ex As Exception
+                    Console.WriteLine("Errore nella lettura dei dati: " & ex.Message)
+                    Continue While
+                End Try
+                
             End While
 
         End If
@@ -768,7 +844,13 @@ Public Class Form1
         dataType = " AND TIPO_DATO LIKE '%AVG%' ORDER BY INS_ORDER"
         logStatement = "SELECT * FROM [ARPA_WEB_CONCENTRAZIONI_CAMINI] WHERE IDX_REPORT = " & ret.ToString() & dataType
         command = New System.Data.SqlClient.SqlCommand(logStatement, connection)
-        reader = command.ExecuteReader()
+        Try
+            reader = command.ExecuteReader()
+        Catch ex As Exception
+            Console.WriteLine("Errore durante l'esecuzione della query: " & ex.Message, "Errore SQL")
+            Return dt
+        End Try
+
 
         Dim nfi As NumberFormatInfo = New CultureInfo("en-US", False).NumberFormat
         nfi.NumberGroupSeparator = ""
@@ -779,63 +861,71 @@ Public Class Form1
         ' Fine modifica
         If (reader.HasRows) Then
             While reader.Read()
-                dr("IDX_REPORT") = reader("IDX_REPORT")
-                'dr("INS_ORDER") = String.Format("{0:n0}", reader("INS_ORDER"))
-                If (type = 2) Then
-                    dr("ORA") = "Giorno"
-                ElseIf (type = 1) Then
-                    dr("ORA") = "Mese"
-                Else
-                    dr("ORA") = "Anno"
-                End If
-
-
-                If result < 0 Then
-
-                    dr("SO2_SECCO") = String.Format("{0:n2}", reader("SO2_SECCO"))
-                    dr("SO2_AVAIL") = String.Format("{0:##}", count1 / max_ore * 100) & "%"
-                    dr("CO_SECCO") = String.Format("{0:n2}", reader("CO_SECCO"))
-                    dr("CO_AVAIL") = String.Format("{0:##}", count2 / max_ore * 100) & "%"
-                    dr("NOX_SECCO") = String.Format("{0:n2}", reader("NOX_SECCO"))
-                    dr("NOX_AVAIL") = String.Format("{0:##}", count3 / max_ore * 100) & "%"
-                    dr("POL_SECCO") = String.Format("{0:n2}", reader("POL_SECCO"))
-                    dr("POL_AVAIL") = String.Format("{0:##}", count4 / max_ore * 100) & "%"
-                    dr("COV_SECCO") = String.Format("{0:n2}", reader("COV_SECCO"))
-                    dr("COV_AVAIL") = String.Format("{0:##}", count5 / max_ore * 100) & "%"
-                    dr("FUMI_SECCO") = String.Format(nfi, "{0:0}", reader("FUMI_SECCO"))
-                    dr("FUMI_AVAIL") = String.Format("{0:##}", count6 / max_ore * 100) & "%"
-
-                    If reader("TIPO_DATO").ToString().Contains("AVG") Then          ''Il valore di media non va nello specchietto subito sotto alla tabella principale, non in fondo alla tabella                    
-                        dr("TIPO_DATO") = ""
+                Try
+                    dr("IDX_REPORT") = reader("IDX_REPORT")
+                    'dr("INS_ORDER") = String.Format("{0:n0}", reader("INS_ORDER"))
+                    If (type = 2) Then
+                        dr("ORA") = "Giorno"
+                    ElseIf (type = 1) Then
+                        dr("ORA") = "Mese"
                     Else
-                        dr("TIPO_DATO") = reader("TIPO_DATO").ToString()
+                        dr("ORA") = "Anno"
                     End If
 
-                Else
-                    dr("SO2_SECCO") = String.Format("{0:n2}", reader("SO2_SECCO"))
-                    dr("SO2_AVAIL") = String.Format("{0:##}", (count1 / max_ore * 100) / 7) & "%"
-                    dr("CO_SECCO") = String.Format("{0:n2}", reader("CO_SECCO"))
-                    dr("CO_AVAIL") = String.Format("{0:##}", (count2 / max_ore * 100) / 7) & "%"
-                    dr("NOX_SECCO") = String.Format("{0:n2}", reader("NOX_SECCO"))
-                    dr("NOX_AVAIL") = String.Format("{0:##}", (count3 / max_ore * 100) / 7) & "%"
-                    dr("POL_SECCO") = String.Format("{0:n2}", reader("POL_SECCO"))
-                    dr("POL_AVAIL") = String.Format("{0:##}", (count4 / max_ore * 100) / 7) & "%"
-                    dr("COV_SECCO") = String.Format("{0:n2}", reader("COV_SECCO"))
-                    dr("COV_AVAIL") = String.Format("{0:##}", (count5 / max_ore * 100) / 7) & "%"
-                    dr("FUMI_SECCO") = String.Format(nfi, "{0:0}", reader("FUMI_SECCO"))
-                    dr("FUMI_AVAIL") = String.Format("{0:##}", (count6 / max_ore * 100) / 7) & "%"
-                    If reader("TIPO_DATO").ToString().Contains("AVG") Then          ''Il valore di media non va nello specchietto subito sotto alla tabella principale, non in fondo alla tabella                    
-                        dr("TIPO_DATO") = ""
-                    Else
-                        dr("TIPO_DATO") = reader("TIPO_DATO").ToString()
-                    End If
 
-                End If
+                    If result < 0 Then
+
+                        dr("SO2_SECCO") = String.Format("{0:n2}", reader("SO2_SECCO"))
+                        dr("SO2_AVAIL") = String.Format("{0:##}", count1 / max_ore * 100) & "%"
+                        dr("CO_SECCO") = String.Format("{0:n2}", reader("CO_SECCO"))
+                        dr("CO_AVAIL") = String.Format("{0:##}", count2 / max_ore * 100) & "%"
+                        dr("NOX_SECCO") = String.Format("{0:n2}", reader("NOX_SECCO"))
+                        dr("NOX_AVAIL") = String.Format("{0:##}", count3 / max_ore * 100) & "%"
+                        dr("POL_SECCO") = String.Format("{0:n2}", reader("POL_SECCO"))
+                        dr("POL_AVAIL") = String.Format("{0:##}", count4 / max_ore * 100) & "%"
+                        dr("COV_SECCO") = String.Format("{0:n2}", reader("COV_SECCO"))
+                        dr("COV_AVAIL") = String.Format("{0:##}", count5 / max_ore * 100) & "%"
+                        dr("FUMI_SECCO") = String.Format(nfi, "{0:0}", reader("FUMI_SECCO"))
+                        dr("FUMI_AVAIL") = String.Format("{0:##}", count6 / max_ore * 100) & "%"
+
+                        If reader("TIPO_DATO").ToString().Contains("AVG") Then          ''Il valore di media non va nello specchietto subito sotto alla tabella principale, non in fondo alla tabella                    
+                            dr("TIPO_DATO") = ""
+                        Else
+                            dr("TIPO_DATO") = reader("TIPO_DATO").ToString()
+                        End If
+
+                    Else
+                        dr("SO2_SECCO") = String.Format("{0:n2}", reader("SO2_SECCO"))
+                        dr("SO2_AVAIL") = String.Format("{0:##}", (count1 / max_ore * 100) / 7) & "%"
+                        dr("CO_SECCO") = String.Format("{0:n2}", reader("CO_SECCO"))
+                        dr("CO_AVAIL") = String.Format("{0:##}", (count2 / max_ore * 100) / 7) & "%"
+                        dr("NOX_SECCO") = String.Format("{0:n2}", reader("NOX_SECCO"))
+                        dr("NOX_AVAIL") = String.Format("{0:##}", (count3 / max_ore * 100) / 7) & "%"
+                        dr("POL_SECCO") = String.Format("{0:n2}", reader("POL_SECCO"))
+                        dr("POL_AVAIL") = String.Format("{0:##}", (count4 / max_ore * 100) / 7) & "%"
+                        dr("COV_SECCO") = String.Format("{0:n2}", reader("COV_SECCO"))
+                        dr("COV_AVAIL") = String.Format("{0:##}", (count5 / max_ore * 100) / 7) & "%"
+                        dr("FUMI_SECCO") = String.Format(nfi, "{0:0}", reader("FUMI_SECCO"))
+                        dr("FUMI_AVAIL") = String.Format("{0:##}", (count6 / max_ore * 100) / 7) & "%"
+                        If reader("TIPO_DATO").ToString().Contains("AVG") Then          ''Il valore di media non va nello specchietto subito sotto alla tabella principale, non in fondo alla tabella                    
+                            dr("TIPO_DATO") = ""
+                        Else
+                            dr("TIPO_DATO") = reader("TIPO_DATO").ToString()
+                        End If
+
+                    End If
 
                     dt.Rows.Add(dr)
                     dr = dt.NewRow()
 
+                Catch ex As Exception
+                    Console.WriteLine("Errore nella lettura dei dati: " & ex.Message)
+                    Continue While
+                End Try
+
             End While
+
+               
 
             dr("ORA") = "Ore Valide"
             dr("SO2_SECCO") = String.Format("{0:n0}", count1)
@@ -847,6 +937,9 @@ Public Class Form1
             dt.Rows.Add(dr)
 
         End If
+
+        queryNumber += 1
+        progress.Report(queryNumber * progressStep)
 
         Return dt
 
@@ -1452,7 +1545,7 @@ Public Class Form1
             MySharedMethod.KillAllExcels()
             System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.CreateSpecificCulture("it-IT")
             ComboStatus.Report(State.Finished)
-            ShowCompletionDialog()
+            ShowCompletionDialog(False)
         End If
 
 
@@ -1727,7 +1820,7 @@ Public Class Form1
             MySharedMethod.KillAllExcels()
             System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.CreateSpecificCulture("it-IT")
             ComboStatus.Report(State.Finished)
-            ShowCompletionDialog()
+            ShowCompletionDialog(False)
         End If
 
     End Sub
@@ -1752,7 +1845,7 @@ Public Class Form1
 
     End Sub
 
-    Private Sub ShowCompletionDialog()
+    Private Sub ShowCompletionDialog(warning As Boolean)
         ' Crea un'istanza del form modale
         Dim completedDownloadForm As New Form2()
 
