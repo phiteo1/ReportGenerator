@@ -8,6 +8,7 @@ Imports System.Runtime.InteropServices
 Public Class Form1
 
     Dim connectionString As String
+    Dim connectionStringCTE As String
     Dim culture As System.Globalization.CultureInfo
     Dim reportType As Int32 = 255
     Dim section As Int32 = 255
@@ -32,16 +33,17 @@ Public Class Form1
 
     Dim actualState As Byte
 
-
     Private Sub Form1_Load(sender As Object, e As EventArgs) Handles MyBase.Load                                'Inizialitation of the database connection, form's item and of the grid view 
 
-        connectionString = ConfigurationManager.ConnectionStrings("GLOBAL_CONN_STR").ConnectionString
+        connectionString = ConfigurationManager.ConnectionStrings("AQMSDBCONN").ConnectionString
+        connectionStringCTE = ConfigurationManager.ConnectionStrings("AQMSDBCONNCTE").ConnectionString
         ComboBox1.SelectedIndex = 0
         ComboBox2.SelectedIndex = 0
         TextBox1.Visible = False
         DateTimePicker1.Value = Date.Now.AddYears(-1)
         culture = System.Globalization.CultureInfo.CreateSpecificCulture("en-US")
         culture.NumberFormat.NumberGroupSeparator = ""
+        TextBox1.Text = "Data Loading..."
         SetDataGridView()
 
 
@@ -57,13 +59,14 @@ Public Class Form1
         Dim endDate As New DateTime(DateTimePicker2.Value.Year, 1, 1)
         ProgressBar1.Visible = True
         ProgressBar1.Maximum = 100
+        TextBox1.Visible = True
 
-        'Refresh the GUI when a change in the progress bar occours
+
         Dim barProgress As New Progress(Of Integer)(Sub(v)
                                                         ProgressBar1.Value = v
-                                                    End Sub)
+                                                    End Sub)                                                    'Refresh the GUI when a change in the progress bar occours
 
-        'Refresh the GUI when a change in the state occours
+
         Dim StatusProgress As New Progress(Of Integer)(Sub(index)
                                                            Select Case index
                                                                Case 1
@@ -86,7 +89,8 @@ Public Class Form1
                                                                    EnableForm()
                                                                    Me.Hide()
                                                            End Select
-                                                       End Sub)
+                                                       End Sub)                                             'Refresh the GUI when a change in the state occours
+
         Dim dataTable1 As DataTable
         Dim dataTable2 As DataTable
         Controls.Add(dgv)
@@ -106,8 +110,8 @@ Public Class Form1
                     dataTable1 = Await Task.Run(Function() GetDataFlussi(barProgress, startDate, endDate, section, reportType, 1, dgv))   'Get the data from the database and assign to first data table structure. The function is runned in an other trhead in order to allow the GUI to refresh properly
                     dataTable2 = Await Task.Run(Function() GetDataFlussi(barProgress, startDate, endDate, section, reportType, 2, dgv2))  'Get the data from the database and assign to second data table structure
                 Else
-                    dataTable1 = Await Task.Run(Function() GetDataBolla1(barProgress, startDate, endDate, section, reportType, dgv))   'Get the data from the database and assign to first data table structure. The function is runned in an other trhead in order to allow the GUI to refresh properly
-                    dataTable2 = Await Task.Run(Function() GetDataBolla2(barProgress, startDate, endDate, section, reportType, dgv2))  'Get the data from the database and assign to second data table structure
+                    dataTable1 = Await Task.Run(Function() GetFirstBollaTable(barProgress, startDate, endDate, section, reportType, dgv))   'Get the data from the database and assign to first data table structure. The function is runned in an other trhead in order to allow the GUI to refresh properly
+                    dataTable2 = Await Task.Run(Function() GetSecondBollaTable(barProgress, startDate, endDate, section, reportType, dgv2))  'Get the data from the database and assign to second data table structure
                 End If
 
             Else
@@ -134,8 +138,7 @@ Public Class Form1
             dgv.Visible = False                                                                                             'Dont' worry about that. It's an hack to get the correct number of rows
             dgv2.Visible = True
             dgv2.Visible = False
-            TextBox1.Text = "Data Loading..."
-            TextBox1.Visible = True
+            
 
             If bolla = 0 Then
                 Await Task.Run(Sub() downloadReportFlussi(StatusProgress, startDate, endDate))                              'Download the reports of the selected years. The function is runned in an other trhead in order to allow the GUI to refresh properly 
@@ -156,12 +159,7 @@ Public Class Form1
             startDate = DateAdd(deltaTime, 1, startDate)
         End While
 
-        Me.Show()
-        If Me.WindowState = FormWindowState.Minimized Then
-            Me.WindowState = FormWindowState.Normal
-        End If
-        Me.BringToFront()
-        Me.Activate()
+        ShowForm()
 
     End Sub
 
@@ -204,10 +202,9 @@ Public Class Form1
 
         Dim dt As New Data.DataTable()
         Dim command As System.Data.SqlClient.SqlCommand
-        Dim command2 As System.Data.SqlClient.SqlCommand
-        Dim reader As System.Data.SqlClient.SqlDataReader
+        Dim commandCTE As System.Data.SqlClient.SqlCommand
         Dim connection As New SqlConnection(connectionString)
-        Dim connection2 As New SqlConnection(connectionString)
+        Dim connectionCTE As New SqlConnection(connectionStringCTE)
         Dim queryNumber As Integer = 0
         Dim queriesCount As Integer = 4
         Dim progressStep As Integer = 100 \ queriesCount
@@ -217,7 +214,7 @@ Public Class Form1
         Try
             ' Tenta di aprire la connessione
             connection.Open()
-            connection2.Open()
+            connectionCTE.Open()
         Catch ex As Exception
             ' Gestione degli errori
             MessageBox.Show("Errore durante la connessione al database: " & ex.Message, "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
@@ -296,7 +293,7 @@ Public Class Form1
             dt.Columns.Add(New Data.DataColumn("NH3_SOMMA", GetType(String)))
 
             dt.Columns.Add(New Data.DataColumn("NOX57_SOMMA", GetType(String)))
-            Dim testCMD As Data.SqlClient.SqlCommand = New Data.SqlClient.SqlCommand("sp_AQMSNT_FILL_ARPA_MASSICI_CAMINI_NODELETE", connection)
+            Dim testCMD As Data.SqlClient.SqlCommand = New Data.SqlClient.SqlCommand("sp_AQMSNT_FILL_ARPA_MASSICI_CAMINI", connection)
             testCMD.CommandTimeout = 18000
             testCMD.CommandType = Data.CommandType.StoredProcedure
             testCMD.Parameters.Add("@idsez", Data.SqlDbType.Int, 11)
@@ -312,37 +309,59 @@ Public Class Form1
             testCMD.Parameters("@retval").Direction = Data.ParameterDirection.Output
             Try
                 testCMD.ExecuteScalar()
-                ret = testCMD.Parameters("@retval").Value
-                queryNumber += 3
-                progress.Report(queryNumber * progressStep)
-
-                testCMD.Parameters("@idsez").Value = 1
-                testCMD.ExecuteScalar()
-
-                ret2 = testCMD.Parameters("@retval").Value
             Catch ex As Exception
                 Console.WriteLine("Errore durante l'esecuzione della stored procedure: " & ex.Message, "Errore SQL")
                 Return dt
             End Try
-            
+            ret = testCMD.Parameters("@retval").Value
+            testCMD = New Data.SqlClient.SqlCommand("sp_AQMSNT_FILL_ARPA_MASSICI_CAMINI", connectionCTE)
+            testCMD.CommandTimeout = 18000
+            testCMD.CommandType = Data.CommandType.StoredProcedure
+            testCMD.Parameters.Add("@idsez", Data.SqlDbType.Int, 11)
+            testCMD.Parameters("@idsez").Direction = Data.ParameterDirection.Input
+            testCMD.Parameters("@idsez").Value = section
+            testCMD.Parameters.Add("@data", Data.SqlDbType.DateTime, 11)
+            testCMD.Parameters("@data").Direction = Data.ParameterDirection.Input
+            testCMD.Parameters("@data").Value = startTime
+            testCMD.Parameters.Add("@TIPO_ESTRAZIONE", Data.SqlDbType.Int, 11)
+            testCMD.Parameters("@TIPO_ESTRAZIONE").Direction = Data.ParameterDirection.Input
+            testCMD.Parameters("@TIPO_ESTRAZIONE").Value = reportType
+            testCMD.Parameters.Add("@retval", Data.SqlDbType.Int)
+            testCMD.Parameters("@retval").Direction = Data.ParameterDirection.Output
+            testCMD.Parameters("@idsez").Value = 1
+            Try
+                testCMD.ExecuteScalar()
+            Catch ex As Exception
+                Console.WriteLine("Errore durante l'esecuzione della stored procedure: " & ex.Message, "Errore SQL")
+                Return dt
+            End Try
+            ret2 = testCMD.Parameters("@retval").Value
+            queryNumber += 3
+            progress.Report(queryNumber * progressStep)
+
             dataType = " AND TIPO_DATO IS NULL ORDER BY INS_ORDER"
 
         End If
 
-
+        Dim reader As System.Data.SqlClient.SqlDataReader
         Dim logStatement As String = "SELECT * FROM [ARPA_WEB_MASSICI_CAMINI] WHERE IDX_REPORT = " & ret.ToString() & dataType
         command = New System.Data.SqlClient.SqlCommand(logStatement, connection)
-        Dim reader2 As System.Data.SqlClient.SqlDataReader
         Try
             reader = command.ExecuteReader()
-            logStatement = "SELECT * FROM [ARPA_WEB_MASSICI_CAMINI] WHERE IDX_REPORT = " & ret2.ToString() & dataType
-            command2 = New System.Data.SqlClient.SqlCommand(logStatement, connection2)
-            reader2 = command2.ExecuteReader()
-
         Catch ex As SqlException
             Console.WriteLine("Errore durante l'esecuzione della query: " & ex.Message, "Errore SQL")
             Return dt
 
+        End Try
+
+        Dim reader2 As System.Data.SqlClient.SqlDataReader
+        logStatement = "SELECT * FROM [ARPA_WEB_MASSICI_CAMINI] WHERE IDX_REPORT = " & ret2.ToString() & dataType
+        commandCTE = New System.Data.SqlClient.SqlCommand(logStatement, connectionCTE)
+        Try
+            reader2 = commandCTE.ExecuteReader()
+        Catch ex As Exception
+            Console.WriteLine("Errore durante l'esecuzione della query: " & ex.Message, "Errore SQL")
+            Return dt
         End Try
 
         Dim dr As Data.DataRow = dt.NewRow()
@@ -483,7 +502,7 @@ Public Class Form1
 
 
 
-            
+
 
         If (startTime < Date.Parse(datanh3)) Then
             hiddenColumns.Add("E9Q_NH3")
@@ -511,38 +530,38 @@ Public Class Form1
         End If
 
         connection.Close()
-        connection2.Close()
+        connectionCTE.Close()
 
-        If whatTable = 2 Then
-            connection2.Open()
-            logStatement = "DELETE FROM ARPA_WEB_MASSICI_CAMINI"
+        'If whatTable = 2 Then
+        '    connectionCTE.Open()
+        '    logStatement = "DELETE FROM ARPA_WEB_MASSICI_CAMINI"
 
-            Using deleteCmd As New SqlCommand(logStatement, connection2)
+        '    Using deleteCmd As New SqlCommand(logStatement, connectionCTE)
 
-                Try
-                    deleteCmd.ExecuteNonQuery()
+        '        Try
+        '            deleteCmd.ExecuteNonQuery()
 
-                Catch ex As SqlException
+        '        Catch ex As SqlException
 
-                    Console.WriteLine("Errore durante l'esecuzione della query: " & ex.Message, "Errore SQL")
+        '            Console.WriteLine("Errore durante l'esecuzione della query: " & ex.Message, "Errore SQL")
 
-                End Try
+        '        End Try
 
-            End Using
+        '    End Using
 
-            connection2.Close()
-        End If
+        '    connectionCTE.Close()
+        'End If
 
         Return dt
     End Function
 
-    Private Function GetDataBolla1(progress As IProgress(Of Integer), startTime As DateTime, endTime As DateTime, section As Int32, type As Int32, dgv As DataGridView) As Data.DataTable
+    Private Function GetFirstBollaTable(progress As IProgress(Of Integer), startTime As DateTime, endTime As DateTime, section As Int32, type As Int32, dgv As DataGridView) As Data.DataTable
 
         Dim dt As New Data.DataTable()
         Dim command As System.Data.SqlClient.SqlCommand
         Dim reader As System.Data.SqlClient.SqlDataReader
         Dim connection As New SqlConnection(connectionString)
-        Dim connection2 As New SqlConnection(connectionString)
+        Dim connectionCTE As New SqlConnection(connectionString)
         Dim queryNumber As Integer = 0
         Dim queriesCount As Integer = 4
         Dim progressStep As Integer = 100 \ queriesCount
@@ -551,7 +570,7 @@ Public Class Form1
         Try
             ' Tenta di aprire la connessione
             connection.Open()
-            connection2.Open()
+            connectionCTE.Open()
         Catch ex As Exception
             ' Gestione degli errori
             MessageBox.Show("Errore durante la connessione al database: " & ex.Message, "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
@@ -737,7 +756,7 @@ Public Class Form1
                 End Try
 
             End While
-                
+
         End If
 
 
@@ -745,19 +764,19 @@ Public Class Form1
         progress.Report(queryNumber * progressStep)
 
         connection.Close()
-        connection2.Close()
+        connectionCTE.Close()
 
         Return dt
 
     End Function
 
-    Private Function GetDataBolla2(progress As IProgress(Of Integer), startTime As DateTime, endTime As DateTime, section As Int32, type As Int32, dgv As DataGridView) As Data.DataTable
+    Private Function GetSecondBollaTable(progress As IProgress(Of Integer), startTime As DateTime, endTime As DateTime, section As Int32, type As Int32, dgv As DataGridView) As Data.DataTable
 
         Dim dt As New Data.DataTable()
         Dim command As System.Data.SqlClient.SqlCommand
         Dim reader As System.Data.SqlClient.SqlDataReader
         Dim connection As New SqlConnection(connectionString)
-        Dim connection2 As New SqlConnection(connectionString)
+        Dim connectionCTE As New SqlConnection(connectionString)
         Dim queryNumber As Integer = 3                                                  'In this case the getData is splitted in two part so the first 3 steps was executed by the first part
         Dim queriesCount As Integer = 4
         Dim progressStep As Integer = 100 \ queriesCount
@@ -767,7 +786,7 @@ Public Class Form1
         Try
             ' Tenta di aprire la connessione
             connection.Open()
-            connection2.Open()
+            connectionCTE.Open()
         Catch ex As Exception
             ' Gestione degli errori
             MessageBox.Show("Errore durante la connessione al database: " & ex.Message, "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
@@ -843,7 +862,7 @@ Public Class Form1
                     Console.WriteLine("Errore nella lettura dei dati: " & ex.Message)
                     Continue While
                 End Try
-                
+
             End While
 
         End If
@@ -933,7 +952,7 @@ Public Class Form1
 
             End While
 
-               
+
 
             dr("ORA") = "Ore Valide"
             dr("SO2_SECCO") = String.Format("{0:n0}", count1)
@@ -953,13 +972,12 @@ Public Class Form1
 
     End Function
 
-
     Private Sub DateTimePicker1_ValueChanged(sender As Object, e As EventArgs) Handles DateTimePicker1.ValueChanged
 
         Dim startDate = DateTimePicker1.Value
         Dim endDate = DateTimePicker2.Value
 
-        If endDate > startDate Then
+        If endDate >= startDate Then
             Button1.Enabled = True
         Else
             Button1.Enabled = False
@@ -972,7 +990,7 @@ Public Class Form1
         Dim startDate = DateTimePicker1.Value
         Dim endDate = DateTimePicker2.Value
 
-        If endDate > startDate Then
+        If endDate >= startDate Then
             Button1.Enabled = True
         Else
             Button1.Enabled = False
@@ -1239,7 +1257,7 @@ Public Class Form1
 
         ComboStatus.Report(State.TableLoading)
         ' Specchietto riassuntivo, visibile solo se il report è annuale
-        If wSheet.Range("B8").Value = "Mese" Then
+        If ((wSheet.Range("B8").Value = "Mese") And (aia = 1)) Then
             ' Intestazione inquinanti tonnellate
             If startDate >= d2 Then
                 wSheet.Range("AG8:AL9").Copy()
@@ -1867,6 +1885,18 @@ Public Class Form1
         ComboBox2.SelectedIndex = 0
         TextBox1.Text = ""
         TextBox1.Visible = False
+
+    End Sub
+
+    Private Sub ShowForm()
+
+        Me.Show()
+
+        If Me.WindowState = FormWindowState.Minimized Then
+            Me.WindowState = FormWindowState.Normal
+        End If
+
+        Me.Activate()
 
     End Sub
 End Class
