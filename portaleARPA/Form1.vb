@@ -117,12 +117,14 @@ Public Class Form1
 
             If dataTable1 Is Nothing OrElse dataTable1.Rows.Count = 0 Then
                 MessageBox.Show("Nessun dato restituito o errore nella query", "Avviso", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                EnableForm()
                 Return
             Else
                 dgv.DataSource = dataTable1                                                                                     'Bind the data to the first DataGridView
             End If
             If dataTable2 Is Nothing OrElse dataTable2.Rows.Count = 0 Then
                 MessageBox.Show("Nessun dato restituito o errore nella query.", "Avviso", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                EnableForm()
                 Return
             Else
                 dgv2.DataSource = dataTable2                                                                                    'Bind the data to the second DataGridView
@@ -132,6 +134,7 @@ Public Class Form1
             dgv.Visible = False                                                                                             'Dont' worry about that. It's an hack to get the correct number of rows
             dgv2.Visible = True
             dgv2.Visible = False
+            TextBox1.Text = "Data Loading..."
             TextBox1.Visible = True
 
             If bolla = 0 Then
@@ -154,6 +157,11 @@ Public Class Form1
         End While
 
         Me.Show()
+        If Me.WindowState = FormWindowState.Minimized Then
+            Me.WindowState = FormWindowState.Normal
+        End If
+        Me.BringToFront()
+        Me.Activate()
 
     End Sub
 
@@ -1545,7 +1553,7 @@ Public Class Form1
             MySharedMethod.KillAllExcels()
             System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.CreateSpecificCulture("it-IT")
             ComboStatus.Report(State.Finished)
-            ShowCompletionDialog(False)
+            ShowCompletionDialog()
         End If
 
 
@@ -1573,13 +1581,7 @@ Public Class Form1
 
         System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.CreateSpecificCulture("en-US")
 
-
-
-
-
         wSheet = wBook.ActiveSheet()
-
-        
 
         Select Case reportType
             Case 0
@@ -1820,7 +1822,7 @@ Public Class Form1
             MySharedMethod.KillAllExcels()
             System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.CreateSpecificCulture("it-IT")
             ComboStatus.Report(State.Finished)
-            ShowCompletionDialog(False)
+            ShowCompletionDialog()
         End If
 
     End Sub
@@ -1843,14 +1845,28 @@ Public Class Form1
             End If
         Next
 
+        ResetForm()
+
     End Sub
 
-    Private Sub ShowCompletionDialog(warning As Boolean)
+    Private Sub ShowCompletionDialog()
         ' Crea un'istanza del form modale
         Dim completedDownloadForm As New Form2()
 
         ' Mostra il form in modalità modale
         completedDownloadForm.ShowDialog()
+
+    End Sub
+
+    Private Sub ResetForm()
+
+        ComboBox1.SelectedIndex = 0
+        ComboBox2.SelectedIndex = 0
+        Button1.Enabled = True
+        ComboBox1.SelectedIndex = 0
+        ComboBox2.SelectedIndex = 0
+        TextBox1.Text = ""
+        TextBox1.Visible = False
 
     End Sub
 End Class

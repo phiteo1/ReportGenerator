@@ -154,7 +154,6 @@ Partial Class Form1
         Me.TextBox1.Name = "TextBox1"
         Me.TextBox1.Size = New System.Drawing.Size(223, 20)
         Me.TextBox1.TabIndex = 15
-        Me.TextBox1.Text = "Data Loading..."
         '
         'CheckBox1
         '
