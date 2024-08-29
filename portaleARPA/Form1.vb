@@ -138,7 +138,7 @@ Public Class Form1
             dgv.Visible = False                                                                                             'Dont' worry about that. It's an hack to get the correct number of rows
             dgv2.Visible = True
             dgv2.Visible = False
-            
+
 
             If bolla = 0 Then
                 Await Task.Run(Sub() downloadReportFlussi(StatusProgress, startDate, endDate))                              'Download the reports of the selected years. The function is runned in an other trhead in order to allow the GUI to refresh properly 
@@ -977,7 +977,7 @@ Public Class Form1
         Dim startDate = DateTimePicker1.Value
         Dim endDate = DateTimePicker2.Value
 
-        If endDate >= startDate Then
+        If endDate.Date >= startDate.Date Then
             Button1.Enabled = True
         Else
             Button1.Enabled = False
@@ -990,7 +990,7 @@ Public Class Form1
         Dim startDate = DateTimePicker1.Value
         Dim endDate = DateTimePicker2.Value
 
-        If endDate >= startDate Then
+        If endDate.Date >= startDate.Date Then
             Button1.Enabled = True
         Else
             Button1.Enabled = False
