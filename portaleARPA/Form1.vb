@@ -4,6 +4,7 @@ Imports System.Globalization
 Imports System.IO
 Imports System.Data.SqlClient
 Imports System.Runtime.InteropServices
+Imports System.Reflection
 
 Public Class Form1
 
@@ -37,6 +38,8 @@ Public Class Form1
 
         connectionString = ConfigurationManager.ConnectionStrings("AQMSDBCONN").ConnectionString
         connectionStringCTE = ConfigurationManager.ConnectionStrings("AQMSDBCONNCTE").ConnectionString
+        Controls.Add(dgv)
+        Controls.Add(dgv2)
         ComboBox1.SelectedIndex = 0
         ComboBox2.SelectedIndex = 0
         TextBox1.Visible = False
@@ -93,8 +96,7 @@ Public Class Form1
 
         Dim dataTable1 As DataTable
         Dim dataTable2 As DataTable
-        Controls.Add(dgv)
-        Controls.Add(dgv2)
+
 
         If Not CheckBox1.Checked Then
             aia = 0
@@ -159,7 +161,7 @@ Public Class Form1
             startDate = DateAdd(deltaTime, 1, startDate)
         End While
 
-        ShowForm()
+        ShowForm()                                                                                                          'Reload the form to initial condition
 
     End Sub
 
@@ -209,7 +211,7 @@ Public Class Form1
         Dim queriesCount As Integer = 4
         Dim progressStep As Integer = 100 \ queriesCount
         Dim dataType As String = " AND TIPO_DATO IS NOT NULL ORDER BY INS_ORDER"
-
+        Dim methodName As String = GetCurrentMethod()
 
         Try
             ' Tenta di aprire la connessione
@@ -304,13 +306,13 @@ Public Class Form1
             testCMD.Parameters("@data").Value = startTime
             testCMD.Parameters.Add("@TIPO_ESTRAZIONE", Data.SqlDbType.Int, 11)
             testCMD.Parameters("@TIPO_ESTRAZIONE").Direction = Data.ParameterDirection.Input
-            testCMD.Parameters("@TIPO_ESTRAZIONE").Value = reportType
+            testCMD.Parameters("@TIPO_ESTRAZIONE").Value = "ciao" 'reportType
             testCMD.Parameters.Add("@retval", Data.SqlDbType.Int)
             testCMD.Parameters("@retval").Direction = Data.ParameterDirection.Output
             Try
                 testCMD.ExecuteScalar()
             Catch ex As Exception
-                Console.WriteLine("Errore durante l'esecuzione della stored procedure: " & ex.Message, "Errore SQL")
+                Logger.LogError("[" & methodName & "]" & " Errore durante l'esecuzione della stored procedure: ", ex)
                 Return dt
             End Try
             ret = testCMD.Parameters("@retval").Value
@@ -332,7 +334,7 @@ Public Class Form1
             Try
                 testCMD.ExecuteScalar()
             Catch ex As Exception
-                Console.WriteLine("Errore durante l'esecuzione della stored procedure: " & ex.Message, "Errore SQL")
+                Logger.LogError("[" & methodName & "]" & " Errore durante l'esecuzione della stored procedure: ", ex)
                 Return dt
             End Try
             ret2 = testCMD.Parameters("@retval").Value
@@ -344,12 +346,12 @@ Public Class Form1
         End If
 
         Dim reader As System.Data.SqlClient.SqlDataReader
-        Dim logStatement As String = "SELECT * FROM [ARPA_WEB_MASSICI_CAMINI] WHERE IDX_REPORT = " & ret.ToString() & dataType
+        Dim logStatement As String = "SELECT * FROM [ARPA_WEB_MASSICI_CAMINI] WHERE IDX_REPORT = '" & ret.ToString() & dataType
         command = New System.Data.SqlClient.SqlCommand(logStatement, connection)
         Try
             reader = command.ExecuteReader()
         Catch ex As SqlException
-            Console.WriteLine("Errore durante l'esecuzione della query: " & ex.Message, "Errore SQL")
+            Logger.LogError("[" & methodName & "]" & " Errore durante l'esecuzione della query: ", ex)
             Return dt
 
         End Try
@@ -360,7 +362,7 @@ Public Class Form1
         Try
             reader2 = commandCTE.ExecuteReader()
         Catch ex As Exception
-            Console.WriteLine("Errore durante l'esecuzione della query: " & ex.Message, "Errore SQL")
+            Logger.LogError("[" & methodName & "]" & " Errore durante l'esecuzione della query: ", ex)
             Return dt
         End Try
 
@@ -489,7 +491,7 @@ Public Class Form1
                     dr = dt.NewRow()
 
                 Catch ex As Exception
-                    Console.WriteLine("Errore nella lettura dei dati: " & ex.Message)
+                    Logger.LogWarning("[" & methodName & "]" & " Errore nella lettura dei dati: ", ex)
                     Continue While
                 End Try
 
@@ -565,7 +567,7 @@ Public Class Form1
         Dim queryNumber As Integer = 0
         Dim queriesCount As Integer = 4
         Dim progressStep As Integer = 100 \ queriesCount
-
+        Dim methodName As String = GetCurrentMethod()
 
         Try
             ' Tenta di aprire la connessione
@@ -633,8 +635,8 @@ Public Class Form1
         testCMD.Parameters("@retval").Direction = Data.ParameterDirection.Output
         Try
             testCMD.ExecuteScalar()
-        Catch ex As SqlException
-            Console.WriteLine("Errore durante l'esecuzione della store procedure: " & ex.Message, "Errore SQL")
+        Catch ex As Exception
+            Logger.LogError("[" & methodName & "]" & " Errore durante l'esecuzione della stored procedure: ", ex)
         End Try
 
         ret = testCMD.Parameters("@retval").Value
@@ -648,8 +650,8 @@ Public Class Form1
 
         Try
             reader = command.ExecuteReader()
-        Catch ex As Exception
-            Console.WriteLine("Errore durante l'esecuzione della query: " & ex.Message, "Errore SQL")
+        Catch ex As SqlException
+            Logger.LogError("[" & methodName & "]" & " Errore durante l'esecuzione della query: ", ex)
             Return dt
         End Try
 
@@ -751,7 +753,7 @@ Public Class Form1
                     dr = dt.NewRow()
 
                 Catch ex As Exception
-                    Console.WriteLine("Errore nella lettura dei dati: " & ex.Message)
+                    Logger.LogWarning("[" & methodName & "]" & " Errore nella lettura dei dati: ", ex)
                     Continue While
                 End Try
 
@@ -782,6 +784,7 @@ Public Class Form1
         Dim progressStep As Integer = 100 \ queriesCount
         Dim aia As Int32 = 1
         Dim dataType As String = " AND TIPO_DATO LIKE '%MAX_ORE%' ORDER BY INS_ORDER"
+        Dim methodName As String = GetCurrentMethod()
 
         Try
             ' Tenta di aprire la connessione
@@ -825,7 +828,7 @@ Public Class Form1
         Try
             reader = command.ExecuteReader()
         Catch ex As SqlException
-            Console.WriteLine("Errore durante l'esecuzione della query: " & ex.Message, "Errore SQL")
+            Logger.LogError("[" & methodName & "]" & " Errore durante l'esecuzione della query: ", ex)
             Return dt
         End Try
 
@@ -843,8 +846,8 @@ Public Class Form1
         command = New System.Data.SqlClient.SqlCommand(logStatement, connection)
         Try
             reader = command.ExecuteReader()
-        Catch ex As Exception
-            Console.WriteLine("Errore durante l'esecuzione della query: " & ex.Message, "Errore SQL")
+        Catch ex As SqlException
+            Logger.LogError("[" & methodName & "]" & " Errore durante l'esecuzione della query: ", ex)
             Return dt
         End Try
 
@@ -859,7 +862,7 @@ Public Class Form1
                     count5 = reader("COV_SECCO")
                     count6 = reader("FUMI_SECCO")
                 Catch ex As Exception
-                    Console.WriteLine("Errore nella lettura dei dati: " & ex.Message)
+                    Logger.LogWarning("[" & methodName & "]" & " Errore nella lettura dei dati: ", ex)
                     Continue While
                 End Try
 
@@ -873,8 +876,8 @@ Public Class Form1
         command = New System.Data.SqlClient.SqlCommand(logStatement, connection)
         Try
             reader = command.ExecuteReader()
-        Catch ex As Exception
-            Console.WriteLine("Errore durante l'esecuzione della query: " & ex.Message, "Errore SQL")
+        Catch ex As SqlException
+            Logger.LogError("[" & methodName & "]" & " Errore durante l'esecuzione della query: ", ex)
             Return dt
         End Try
 
@@ -946,7 +949,7 @@ Public Class Form1
                     dr = dt.NewRow()
 
                 Catch ex As Exception
-                    Console.WriteLine("Errore nella lettura dei dati: " & ex.Message)
+                    Logger.LogWarning("[" & methodName & "]" & " Errore nella lettura dei dati: ", ex)
                     Continue While
                 End Try
 
@@ -1867,11 +1870,9 @@ Public Class Form1
 
     End Sub
 
-    Private Sub ShowCompletionDialog()
-        ' Crea un'istanza del form modale
-        Dim completedDownloadForm As New Form2()
+    Private Sub ShowCompletionDialog()                                                                                  ' Crea un'istanza del form modale e la mostra in modalità                                       
 
-        ' Mostra il form in modalità modale
+        Dim completedDownloadForm As New Form2()
         completedDownloadForm.ShowDialog()
 
     End Sub
@@ -1899,4 +1900,9 @@ Public Class Form1
         Me.Activate()
 
     End Sub
+
+    Private Function GetCurrentMethod(<Runtime.CompilerServices.CallerMemberName> Optional callerName As String = Nothing) As String
+        Return callerName
+    End Function
+
 End Class

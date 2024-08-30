@@ -95,6 +95,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="App_Code\MySharedMethod.vb" />
+    <Compile Include="Logger.vb" />
     <Compile Include="Form1.vb">
       <SubType>Form</SubType>
     </Compile>
