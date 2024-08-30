@@ -21,8 +21,9 @@ Public Class Form1
     Dim mesenh3 As Integer = ConfigurationManager.AppSettings("mesenh3")
     Dim hiddenColumns As New List(Of String)()
     Dim d2 As Date
-    Dim bolla As Byte
+    Dim bolla As Byte = 254
     Dim aia As Int32 = 1
+    Dim hnf, htran As String
 
     Enum State                  'State Machine of the downloading process
         DataLoading = 1
@@ -117,8 +118,8 @@ Public Class Form1
                 End If
 
             Else
-                dataTable1 = Nothing
-                dataTable2 = Nothing
+                dataTable1 = Await Task.Run(Function() GetFirstCaminiTable(barProgress, startDate, endDate, section, reportType, dgv))
+                dataTable2 = Await Task.Run(Function() GetSecondCaminiTable(barProgress, startDate, endDate, section, reportType, dgv2))
             End If
 
             If dataTable1 Is Nothing OrElse dataTable1.Rows.Count = 0 Then
@@ -148,7 +149,9 @@ Public Class Form1
             ElseIf bolla = 1 Then
                 Await Task.Run(Sub() downloadReportBolla(StatusProgress, startDate, endDate))
             Else
-                'todo
+                If reportType = 0 Then
+                    Await Task.Run(Sub() downloadYearlyReportCamini(StatusProgress, startDate, endDate))
+                End If
             End If
 
             Dim deltaTime As String
@@ -306,7 +309,7 @@ Public Class Form1
             testCMD.Parameters("@data").Value = startTime
             testCMD.Parameters.Add("@TIPO_ESTRAZIONE", Data.SqlDbType.Int, 11)
             testCMD.Parameters("@TIPO_ESTRAZIONE").Direction = Data.ParameterDirection.Input
-            testCMD.Parameters("@TIPO_ESTRAZIONE").Value = "ciao" 'reportType
+            testCMD.Parameters("@TIPO_ESTRAZIONE").Value = reportType
             testCMD.Parameters.Add("@retval", Data.SqlDbType.Int)
             testCMD.Parameters("@retval").Direction = Data.ParameterDirection.Output
             Try
@@ -346,7 +349,7 @@ Public Class Form1
         End If
 
         Dim reader As System.Data.SqlClient.SqlDataReader
-        Dim logStatement As String = "SELECT * FROM [ARPA_WEB_MASSICI_CAMINI] WHERE IDX_REPORT = '" & ret.ToString() & dataType
+        Dim logStatement As String = "SELECT * FROM [ARPA_WEB_MASSICI_CAMINI] WHERE IDX_REPORT = " & ret.ToString() & dataType
         command = New System.Data.SqlClient.SqlCommand(logStatement, connection)
         Try
             reader = command.ExecuteReader()
@@ -557,13 +560,441 @@ Public Class Form1
         Return dt
     End Function
 
+    Private Function GetFirstCaminiTable(progress As IProgress(Of Integer), startTime As DateTime, endTime As DateTime, section As Int32, ByVal type As Int32, dgv As DataGridView) As Data.DataTable
+
+        Dim dt As New Data.DataTable()
+        Dim command As System.Data.SqlClient.SqlCommand
+        Dim reader As System.Data.SqlClient.SqlDataReader
+        Dim connection As New SqlConnection(connectionString)
+        Dim queryNumber As Integer = 0
+        Dim queriesCount As Integer = 4
+        Dim progressStep As Integer = 100 \ queriesCount
+        Dim methodName As String = GetCurrentMethod()
+        Dim dataType As String = " ORDER BY N_RIGA"
+        Dim retLong As Long
+
+        If reportType = 0 Then                                                      ' It was needed thanks to the genius who wrote the logics in the portal :))
+            type = 3
+        ElseIf reportType = 1 Then
+            type = 2
+        End If
+
+        Try
+            ' Tenta di aprire la connessione
+            connection.Open()
+        Catch ex As Exception
+            ' Gestione degli errori
+            MessageBox.Show("Errore durante la connessione al database: " & ex.Message, "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Return dt
+        End Try
+
+
+
+        dt.Columns.Add(New Data.DataColumn("INTESTAZIONE", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("CO", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("NOX", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("SO2", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("POLVERI", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("COV", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("NH3", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("O2", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("QFUMI", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("TFUMI", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("PFUMI", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("H2O", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("O2RIF", GetType(String)))
+
+        queryNumber += 1
+        progress.Report(queryNumber * progressStep)
+
+        Dim testCMD As Data.SqlClient.SqlCommand = New Data.SqlClient.SqlCommand("sp_AQMSNT_FILL_ARPA_REPORT_WEB", connection)
+        testCMD.CommandType = Data.CommandType.StoredProcedure
+        testCMD.Parameters.Add("@idsez", Data.SqlDbType.Int, 11)
+        testCMD.Parameters("@idsez").Direction = Data.ParameterDirection.Input
+        testCMD.Parameters("@idsez").Value = section
+
+        testCMD.Parameters.Add("@data", Data.SqlDbType.DateTime, 11)
+        testCMD.Parameters("@data").Direction = Data.ParameterDirection.Input
+        testCMD.Parameters("@data").Value = Format("{0:dd/MM/yyyy}", startTime)
+
+
+        testCMD.Parameters.Add("@aia", Data.SqlDbType.Int, 11)
+        testCMD.Parameters("@aia").Direction = Data.ParameterDirection.Input
+        testCMD.Parameters("@aia").Value = aia
+
+
+        testCMD.Parameters.Add("@tipoestrazione", Data.SqlDbType.Int, 11)
+        testCMD.Parameters("@tipoestrazione").Direction = Data.ParameterDirection.Input
+        testCMD.Parameters("@tipoestrazione").Value = type
+
+        testCMD.Parameters.Add("@retval", Data.SqlDbType.BigInt, 8)
+        testCMD.Parameters("@retval").Direction = Data.ParameterDirection.Output
+        testCMD.Parameters.Add("@HNF", Data.SqlDbType.Int)
+        testCMD.Parameters("@HNF").Direction = Data.ParameterDirection.Output
+        testCMD.Parameters.Add("@H_TRANS", Data.SqlDbType.Int)
+        testCMD.Parameters("@H_TRANS").Direction = Data.ParameterDirection.Output
+
+        Try
+            testCMD.ExecuteScalar()
+        Catch ex As Exception
+            Logger.LogError("[" & methodName & "]" & " Errore durante l'esecuzione della stored procedure: ", ex)
+            Return dt
+        End Try
+
+        retLong = testCMD.Parameters("@retval").Value
+
+        hnf = testCMD.Parameters("@HNF").Value.ToString()
+        htran = testCMD.Parameters("@H_TRANS").Value.ToString()
+
+        queryNumber += 1
+        progress.Report(queryNumber * progressStep)
+
+        Dim log_statement As String = "SELECT * FROM [ARPA_REPORT_WEB] WHERE IDX_REPORT = " & retLong.ToString() & dataType
+        command = New System.Data.SqlClient.SqlCommand(log_statement, connection)
+        Try
+            reader = command.ExecuteReader()
+        Catch ex As SqlException
+            Logger.LogError("[" & methodName & "]" & " Errore durante l'esecuzione della query: ", ex)
+            Return dt
+        End Try
+
+        Dim dr As Data.DataRow = dt.NewRow()
+        While reader.Read()
+            Try
+                dr("INTESTAZIONE") = reader("INTESTAZIONE")
+
+                If type = 2 Then
+                    If (dr("INTESTAZIONE") = "VLE GIC [mg/Nm3]" And section = 3 Or section = 4 Or section = 7 And aia = 0) Then
+                        dr = dt.NewRow()
+                    End If
+                End If
+
+                If (IsNumeric(reader("CO"))) Then
+                    If (Convert.ToDouble(reader("CO")) >= 0) Then
+                        dr("CO") = String.Format("{0:n2}", reader("CO"))
+                    Else
+                        dr("CO") = "N.A."
+                    End If
+                Else
+                    dr("CO") = "N.A."
+                End If
+
+
+                If (IsNumeric(reader("NOX"))) Then
+                    If (Convert.ToDouble(reader("NOX")) >= 0) Then
+                        dr("NOX") = String.Format("{0:n2}", reader("NOX"))
+                    Else
+                        dr("NOX") = "N.A."
+                    End If
+                Else
+                    dr("NOX") = "N.A."
+                End If
+
+                'Inserisce N.A. quando i vle degli inquinanti non sono presenti
+
+                If (IsNumeric(reader("SO2"))) Then
+                    If (Convert.ToDouble(reader("SO2")) >= 0) Then
+                        dr("SO2") = String.Format("{0:n2}", reader("SO2"))
+
+                    Else
+                        dr("SO2") = "N.A."
+                    End If
+                Else
+                    dr("SO2") = "N.A."
+                End If
+
+
+
+                If (IsNumeric(reader("POLVERI"))) Then
+                    If (Convert.ToDouble(reader("POLVERI")) > 0) Then
+                        dr("POLVERI") = String.Format("{0:n2}", reader("POLVERI"))
+                    Else
+                        dr("POLVERI") = "N.A."
+                    End If
+                Else
+                    dr("POLVERI") = "N.A."
+                End If
+
+
+                If (IsNumeric(reader("COV"))) Then
+                    If (Convert.ToDouble(reader("COV")) > 0) Then
+                        dr("COV") = String.Format("{0:n2}", reader("COV"))
+                    Else
+                        dr("COV") = "N.A."
+                    End If
+                Else
+                    dr("COV") = "N.A."
+                End If
+                '      If ((SelectedDate.Value > datanh3) And (String.Equals(Sezione.Text, "6"))) Then
+                If (IsNumeric(reader("NH3"))) Then
+                    If (Convert.ToDouble(reader("NH3")) > 0) Then
+                        dr("NH3") = String.Format("{0:n2}", reader("NH3"))
+                    Else
+                        dr("NH3") = "N.A."
+                    End If
+                Else
+                    dr("NH3") = "N.A."
+                End If
+
+
+
+                'If (String.Equals(Sezione.Text, "6")) Then
+
+                'End If
+                dr("O2") = String.Format("{0:n2}", reader("O2"))
+                dr("QFUMI") = String.Format("{0:n2}", reader("QFUMI"))
+                dr("TFUMI") = String.Format("{0:n2}", reader("TFUMI"))
+                dr("PFUMI") = String.Format("{0:n2}", reader("PFUMI"))
+                dr("H2O") = String.Format("{0:n2}", reader("H2O"))
+                dr("O2RIF") = String.Format("{0:n2}", reader("O2RIF"))
+                'dr("MWE") = String.Format("{0:n2}", reader("MWE"))
+
+                dt.Rows.Add(dr)
+                dr = dt.NewRow()
+            Catch ex As Exception
+                Logger.LogWarning("[" & methodName & "]" & " Errore nella lettura dei dati: ", ex)
+                Continue While
+            End Try
+
+        End While
+
+        If ((startTime < Date.Parse(datanh3)) Or (startTime >= Date.Parse(datanh3) And section <> 6)) Then
+            hiddenColumns.Add("NH3")
+        End If
+
+
+        For Each column As DataGridViewColumn In dgv.Columns
+            If hiddenColumns.Contains(column.DataPropertyName) Then
+                column.Visible = False
+            End If
+        Next
+
+        ' Se hiddenColumns è vuoto, rende visibili tutte le colonne
+        If hiddenColumns.Count.Equals(0) Then
+            For Each column As DataGridViewColumn In dgv.Columns
+                column.Visible = True
+            Next
+        End If
+
+        queryNumber += 1
+        progress.Report(queryNumber * progressStep)
+
+        connection.Close()
+
+        Return dt
+    End Function
+
+
+    Private Function GetSecondCaminiTable(progress As IProgress(Of Integer), startTime As DateTime, endTime As DateTime, section As Int32, type As Int32, dgv As DataGridView) As Data.DataTable
+
+        Dim dt As New Data.DataTable()
+        Dim command As System.Data.SqlClient.SqlCommand
+        Dim reader As System.Data.SqlClient.SqlDataReader
+        Dim connection As New SqlConnection(connectionString)
+        Dim queryNumber As Integer = 3
+        Dim queriesCount As Integer = 4
+        Dim progressStep As Integer = 100 \ queriesCount
+        Dim methodName As String = GetCurrentMethod()
+        Dim dataType As String = " ORDER BY INS_ORDER"
+        Dim retLong As Long
+
+        If reportType = 0 Then                                                      ' It was needed thanks to the genius who wrote the logics in the portal :))
+            type = 3
+        ElseIf reportType = 1 Then
+            type = 2
+        End If
+
+        Try
+            ' Tenta di aprire la connessione
+            connection.Open()
+        Catch ex As Exception
+            ' Gestione degli errori
+            MessageBox.Show("Errore durante la connessione al database: " & ex.Message, "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Return dt
+        End Try
+
+        dt.Columns.Add(New Data.DataColumn("IDX_REPORT", GetType(Double)))
+        dt.Columns.Add(New Data.DataColumn("INS_ORDER", GetType(Integer)))
+        dt.Columns.Add(New Data.DataColumn("ORA", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("NOX_IC", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("NOX_VLE", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("DISP_NOX", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("IS_BOLD_NOX", GetType(Integer)))
+        dt.Columns.Add(New Data.DataColumn("CO_IC", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("CO_VLE", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("DISP_CO", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("IS_BOLD_CO", GetType(Integer)))
+        dt.Columns.Add(New Data.DataColumn("SO2_IC", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("SO2_VLE", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("DISP_SO2", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("IS_BOLD_SO2", GetType(Integer)))
+        dt.Columns.Add(New Data.DataColumn("POLVERI_IC", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("POLVERI_VLE", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("DISP_POLVERI", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("IS_BOLD_POLVERI", GetType(Integer)))
+        dt.Columns.Add(New Data.DataColumn("COV_IC", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("COV_VLE", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("DISP_COV", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("IS_BOLD_COV", GetType(Integer)))
+        dt.Columns.Add(New Data.DataColumn("O2_MIS", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("O2_RIF", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("NH3_IC", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("NH3_VLE", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("DISP_NH3", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("TFUMI", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("PFUMI", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("ORE_NF", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("QFUMI", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("UFUMI", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("PORTATA_CO", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("PORTATA_NOX", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("PORTATA_SO2", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("PORTATA_POLVERI", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("PORTATA_COV", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("PORTATA_NH3", GetType(String)))
+
+        Dim testCMD As Data.SqlClient.SqlCommand = New Data.SqlClient.SqlCommand("sp_AQMSNT_FILL_ARPA_MESE_ANNO_REPORT", connection)
+        testCMD.CommandType = Data.CommandType.StoredProcedure
+        testCMD.Parameters.Add("@idsez", Data.SqlDbType.Int, 11)
+        testCMD.Parameters("@idsez").Direction = Data.ParameterDirection.Input
+        testCMD.Parameters("@idsez").Value = Convert.ToInt32(section) 'Request.QueryString("Sezione").ToString())
+
+        testCMD.Parameters.Add("@data", Data.SqlDbType.DateTime, 11)
+        testCMD.Parameters("@data").Direction = Data.ParameterDirection.Input
+        testCMD.Parameters("@data").Value = Format("{0:dd/MM/yyyy}", startTime) 'RepggCal.SelectedDate.ToString("dd/MM/yyyy HH:mm:ss")
+
+
+        testCMD.Parameters.Add("@aia", Data.SqlDbType.Int, 11)
+        testCMD.Parameters("@aia").Direction = Data.ParameterDirection.Input
+        testCMD.Parameters("@aia").Value = Int32.Parse(aia)
+
+
+
+
+        testCMD.Parameters.Add("@IS_MESE", Data.SqlDbType.Int, 11)
+        testCMD.Parameters("@IS_MESE").Direction = Data.ParameterDirection.Input
+        testCMD.Parameters("@IS_MESE").Value = 0
+
+        testCMD.Parameters.Add("@retval", Data.SqlDbType.BigInt, 8)
+        testCMD.Parameters("@retval").Direction = Data.ParameterDirection.Output
+        testCMD.Parameters.Add("@LL_GG_NOX", Data.SqlDbType.Float)
+        testCMD.Parameters("@LL_GG_NOX").Direction = Data.ParameterDirection.Output
+        testCMD.Parameters.Add("@LL_GG_CO", Data.SqlDbType.Float)
+        testCMD.Parameters("@LL_GG_CO").Direction = Data.ParameterDirection.Output
+        testCMD.Parameters.Add("@LL_GG_SO2", Data.SqlDbType.Float)
+        testCMD.Parameters("@LL_GG_SO2").Direction = Data.ParameterDirection.Output
+        testCMD.Parameters.Add("@LL_GG_POLVERI", Data.SqlDbType.Float)
+        testCMD.Parameters("@LL_GG_POLVERI").Direction = Data.ParameterDirection.Output
+        testCMD.Parameters.Add("@LL_GG_COV", Data.SqlDbType.Float)
+        testCMD.Parameters("@LL_GG_COV").Direction = Data.ParameterDirection.Output
+        testCMD.Parameters.Add("@LL_GG_NH3", Data.SqlDbType.Float)
+        testCMD.Parameters("@LL_GG_NH3").Direction = Data.ParameterDirection.Output
+
+        Try
+            testCMD.ExecuteScalar()
+        Catch ex As Exception
+            Logger.LogError("[" & methodName & "]" & " Errore durante l'esecuzione della stored procedure: ", ex)
+            Return dt
+        End Try
+
+        retLong = testCMD.Parameters("@retval").Value
+
+        Dim log_statement As String = "SELECT * FROM [ARPA_WEB_MESE_ANNO_REPORT2] WHERE IDX_REPORT = " & retLong.ToString() & dataType
+        command = New System.Data.SqlClient.SqlCommand(log_statement, connection)
+
+        Try
+            reader = command.ExecuteReader()
+        Catch ex As SqlException
+            Logger.LogError("[" & methodName & "]" & " Errore durante l'esecuzione della query: ", ex)
+            Return dt
+        End Try
+
+        Dim dr As Data.DataRow = dt.NewRow()
+        While reader.Read()
+            Try
+                dr("IDX_REPORT") = reader("IDX_REPORT")
+                dr("INS_ORDER") = String.Format("{0:n0}", reader("INS_ORDER"))
+                dr("ORA") = reader("ORA") 'String.Format("{0:n2}", reader("NOX"))
+                dr("NOX_IC") = String.Format("{0:n2}", reader("NOX_IC"))
+                dr("NOX_VLE") = String.Format("{0:n2}", reader("NOX_VLE"))
+                dr("DISP_NOX") = String.Format("{0:n2}", reader("DISP_NOX"))
+                dr("IS_BOLD_NOX") = reader("IS_BOLD_NOX")
+                dr("CO_IC") = String.Format("{0:n2}", reader("CO_IC"))
+                dr("CO_VLE") = String.Format("{0:n2}", reader("CO_VLE"))
+                dr("DISP_CO") = String.Format("{0:n2}", reader("DISP_CO"))
+                'bold= superi segnalati in rosso nel mensile)
+                dr("IS_BOLD_CO") = reader("IS_BOLD_CO")
+                dr("SO2_IC") = String.Format("{0:n2}", reader("SO2_IC"))
+                dr("SO2_VLE") = String.Format("{0:n2}", reader("SO2_VLE"))
+                dr("DISP_SO2") = String.Format("{0:n2}", reader("DISP_SO2"))
+                dr("IS_BOLD_SO2") = reader("IS_BOLD_SO2")
+                dr("POLVERI_IC") = String.Format("{0:n2}", reader("POLVERI_IC"))
+                dr("POLVERI_VLE") = String.Format("{0:n2}", reader("POLVERI_VLE"))
+                dr("DISP_POLVERI") = String.Format("{0:n2}", reader("DISP_POLVERI"))
+                dr("IS_BOLD_POLVERI") = reader("IS_BOLD_POLVERI")
+
+                dr("COV_IC") = String.Format("{0:n2}", reader("COV_IC"))
+                dr("COV_VLE") = String.Format("{0:n2}", reader("COV_VLE"))
+                dr("DISP_COV") = String.Format("{0:n2}", reader("DISP_COV"))
+
+                'Inserimento colonna bold (per il supero dell'inquinante COV) I limiti VLE del COV sono presenti solo nella nuova AIA. (Mensile e annuale)
+                dr("IS_BOLD_COV") = reader("IS_BOLD_COV")
+
+                dr("O2_MIS") = String.Format("{0:n2}", reader("O2_MIS"))
+                dr("O2_RIF") = String.Format("{0:n2}", reader("O2_RIF"))
+                dr("TFUMI") = String.Format("{0:n2}", reader("TFUMI"))
+                dr("PFUMI") = String.Format("{0:n2}", reader("PFUMI"))
+                dr("ORE_NF") = reader("ORE_NF")
+                dr("QFUMI") = String.Format("{0:n2}", reader("QFUMI"))
+                dr("UFUMI") = String.Format("{0:n2}", reader("UFUMI"))
+                dr("PORTATA_CO") = String.Format("{0:n2}", reader("PORTATA_CO"))
+                dr("PORTATA_NOX") = String.Format("{0:n2}", reader("PORTATA_NOX"))
+                dr("PORTATA_SO2") = String.Format("{0:n2}", reader("PORTATA_SO2"))
+                dr("PORTATA_POLVERI") = String.Format("{0:n2}", reader("PORTATA_POLVERI"))
+                dr("PORTATA_COV") = String.Format("{0:n2}", reader("PORTATA_COV"))
+                dr("PORTATA_NH3") = String.Format("{0:n2}", reader("PORTATA_NH3"))
+                dr("NH3_IC") = String.Format("{0:n2}", reader("NH3_IC"))
+                dr("NH3_VLE") = String.Format("{0:n2}", reader("NH3_VLE"))
+                dr("DISP_NH3") = String.Format("{0:n2}", reader("DISP_NH3"))
+
+                dt.Rows.Add(dr)
+                dr = dt.NewRow()
+
+            Catch ex As Exception
+                Logger.LogWarning("[" & methodName & "]" & " Errore nella lettura dei dati: ", ex)
+                Continue While
+            End Try
+
+        End While
+
+        If (startTime < Date.Parse(datanh3) Or startTime >= Date.Parse(datanh3) And section <> 6) Then
+            hiddenColumns.Add("NH3_IC")
+            hiddenColumns.Add("NH3_VLE")
+            hiddenColumns.Add("DISP_NH3")
+            hiddenColumns.Add("PORTATA_NH3")
+        End If
+
+
+        For Each column As DataGridViewColumn In dgv.Columns
+            If hiddenColumns.Contains(column.DataPropertyName) Then
+                column.Visible = False
+            End If
+        Next
+
+        connection.Close()
+
+        Return dt
+    End Function
+
+
+
+
     Private Function GetFirstBollaTable(progress As IProgress(Of Integer), startTime As DateTime, endTime As DateTime, section As Int32, type As Int32, dgv As DataGridView) As Data.DataTable
 
         Dim dt As New Data.DataTable()
         Dim command As System.Data.SqlClient.SqlCommand
         Dim reader As System.Data.SqlClient.SqlDataReader
         Dim connection As New SqlConnection(connectionString)
-        Dim connectionCTE As New SqlConnection(connectionString)
         Dim queryNumber As Integer = 0
         Dim queriesCount As Integer = 4
         Dim progressStep As Integer = 100 \ queriesCount
@@ -572,7 +1003,6 @@ Public Class Form1
         Try
             ' Tenta di aprire la connessione
             connection.Open()
-            connectionCTE.Open()
         Catch ex As Exception
             ' Gestione degli errori
             MessageBox.Show("Errore durante la connessione al database: " & ex.Message, "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
@@ -630,13 +1060,14 @@ Public Class Form1
         testCMD.Parameters("@data").Value = startTime
         testCMD.Parameters.Add("@TIPO_ESTRAZIONE", Data.SqlDbType.Int, 11)
         testCMD.Parameters("@TIPO_ESTRAZIONE").Direction = Data.ParameterDirection.Input
-        testCMD.Parameters("@TIPO_ESTRAZIONE").Value = reportType
+        testCMD.Parameters("@TIPO_ESTRAZIONE").Value = type
         testCMD.Parameters.Add("@retval", Data.SqlDbType.Int)
         testCMD.Parameters("@retval").Direction = Data.ParameterDirection.Output
         Try
             testCMD.ExecuteScalar()
         Catch ex As Exception
             Logger.LogError("[" & methodName & "]" & " Errore durante l'esecuzione della stored procedure: ", ex)
+            Return dt
         End Try
 
         ret = testCMD.Parameters("@retval").Value
@@ -766,7 +1197,7 @@ Public Class Form1
         progress.Report(queryNumber * progressStep)
 
         connection.Close()
-        connectionCTE.Close()
+
 
         Return dt
 
@@ -778,7 +1209,6 @@ Public Class Form1
         Dim command As System.Data.SqlClient.SqlCommand
         Dim reader As System.Data.SqlClient.SqlDataReader
         Dim connection As New SqlConnection(connectionString)
-        Dim connectionCTE As New SqlConnection(connectionString)
         Dim queryNumber As Integer = 3                                                  'In this case the getData is splitted in two part so the first 3 steps was executed by the first part
         Dim queriesCount As Integer = 4
         Dim progressStep As Integer = 100 \ queriesCount
@@ -789,7 +1219,6 @@ Public Class Form1
         Try
             ' Tenta di aprire la connessione
             connection.Open()
-            connectionCTE.Open()
         Catch ex As Exception
             ' Gestione degli errori
             MessageBox.Show("Errore durante la connessione al database: " & ex.Message, "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
@@ -971,9 +1400,15 @@ Public Class Form1
         queryNumber += 1
         progress.Report(queryNumber * progressStep)
 
+        connection.Close()
+
         Return dt
 
     End Function
+
+
+
+
 
     Private Sub DateTimePicker1_ValueChanged(sender As Object, e As EventArgs) Handles DateTimePicker1.ValueChanged
 
@@ -1845,6 +2280,224 @@ Public Class Form1
             ComboStatus.Report(State.Finished)
             ShowCompletionDialog()
         End If
+
+    End Sub
+
+    Private Sub downloadYearlyReportCamini(ComboStatus As IProgress(Of Integer), startDate As Date, endDate As Date)
+
+        Dim excel As New Microsoft.Office.Interop.Excel.Application
+        Dim wBook As Microsoft.Office.Interop.Excel.Workbook
+        Dim wSheet As Microsoft.Office.Interop.Excel.Worksheet
+        Dim exePath As String = Application.StartupPath
+        Dim rootPath As String = Directory.GetParent(Directory.GetParent(exePath).FullName).FullName
+        Dim reportTitle As String = ""
+        Dim d2 As Date = New Date(2020, mesenh3, 1)
+
+        System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.CreateSpecificCulture("en-US")
+
+        If (startDate.Year >= d2.Year And section = 6) Then
+
+            wBook = excel.Workbooks.Open(Path.Combine(rootPath, "template", "E9_152_CONC_ANNO_TARANTO_RAFF_COV.xls"))
+        Else
+
+            wBook = excel.Workbooks.Open(Path.Combine(rootPath, "template", "152_GIORNO_BOLLA_CAMINI.xls"))
+
+        End If
+
+        wSheet = wBook.ActiveSheet()
+
+        Dim percentuale As String
+
+        Dim i As Integer
+        Dim j As Integer
+        Dim cc As Integer
+        Dim app As String
+        Dim col As Integer
+        Dim insert_tab As Integer
+        cc = 11
+
+        ComboStatus.Report(State.TableLoading)
+
+        wSheet.Range("NomeTabella").Value = "152_CONC_ANNO"
+        wSheet.Range("NomeTabella").Font.Bold = True
+        wSheet.Range("NomeCentrale").Value = "ENI R&M - Raffineria di Taranto - CAMINO " & MySharedMethod.GetChimneyName(Convert.ToInt16(section.ToString()))
+        wSheet.Range("NomeCentrale").Font.Bold = True
+        wSheet.Range("SisMisura").Value = "Sistema di Monitoraggio delle Emissioni"
+        wSheet.Range("SisMisura").Font.Bold = True
+
+        wSheet.Range("TitoloTabella").Font.Bold = True
+        wSheet.Range("IntervalloDate").Value = "Report Annuale Anno " & startDate.Year
+        wSheet.Range("IntervalloDate").Font.Bold = True
+        'wSheet.Range("HNF").Value = hnf
+        'wSheet.Range("HNF").Font.Bold = True
+        'wSheet.Range("HTRANS").Value = htran
+        'wSheet.Range("HTRANS").Font.Bold = True
+        reportTitle = MySharedMethod.GetChimneyName(Convert.ToInt16(section.ToString())) & "_CONC_ANNO" & startDate.Year
+
+        If (startDate.Year < 2018) Then
+            percentuale = "- Dlgs 152 (70%)"
+        ElseIf (startDate.Year = 2018) Then
+            percentuale = ""
+            wSheet.Range("Gestione70").Value = "Dal 1/01/2018  al 31/10/2018 le medie orarie sono validate con disponibilità 70%."
+            wSheet.Range("Gestione75").Value = " Dal 1/11/2018 le medie orarie sono validate con disponibilità al 75%."
+        Else
+            percentuale = "- Dlgs 152 (75%)"
+        End If
+
+        wSheet.Range("TitoloTabella").Value = "Report Annuale concentrazioni medie mensili (Nox,Co, SO2, Polveri, COV)  " & percentuale.ToString()
+        If (startDate.Year >= d2.Year And section = 6) Then
+            wSheet.Range("TitoloTabella").Value = "Report Annuale concentrazioni medie mensili (Nox,Co, SO2, Polveri, COV,NH3)  " & percentuale.ToString()
+            wSheet.Range("NOTA_E9").Value = "Parametro NH3 disponibile sul camino E9 dal mese di Ottobre 2020 a seguito del completamento dei test funzionali, in ottemperanza alla prescrizione [43] dell’AIA DM92/2018"
+        End If
+
+        If (section <> 2) Then
+            Try
+                wSheet.Range("NOTA_E2").Value = ""
+            Catch ex As Exception
+            End Try
+        End If
+
+        If (aia = 1) Then
+            If (startDate.Year > "2018") Then
+                Try
+                    wSheet.Range("NOTA_FRASE2").Value = ""
+                    wSheet.Range("NOTA_FRASE").Value = ""
+                Catch ex As Exception
+                End Try
+            ElseIf (startDate.Year = "2018") Then
+                Try
+                    wSheet.Range("NOTA_FRASE2").Value = ""
+                Catch ex As Exception
+                End Try
+            End If
+        ElseIf (aia = 0) Then
+            If (startDate.Year = "2018") Then
+                Try
+                    wSheet.Range("NOTA_FRASE").Value = ""
+                Catch ex As Exception
+                End Try
+            End If
+        End If
+
+        Dim firstRow As Integer
+        Dim firstColumn As String
+        Dim lastColumn As String
+        Dim currentExcelCol As String
+
+        firstRow = wSheet.Range("FirstRow").Row
+        firstColumn = wSheet.Range("FIRST_COLUMN").Address.Split({"$"c}, StringSplitOptions.RemoveEmptyEntries)(0)
+        lastColumn = wSheet.Range("LAST_COLUMN").Address.Split({"$"c}, StringSplitOptions.RemoveEmptyEntries)(0)
+
+        ComboStatus.Report(State.SheetLoading)
+
+        For i = 0 To dgv2.Rows.Count - 1
+            ' Seleziona la riga corrente in DataGridView
+            dgv2.ClearSelection()
+            dgv2.Rows(i).Selected = True
+
+            app = firstColumn & (i + firstRow).ToString & ":" & lastColumn & (i + firstRow).ToString
+            wSheet.Rows(firstRow + i + 1).Insert()
+            wSheet.Range(firstColumn & firstRow & ":" & lastColumn & firstRow).Copy(wSheet.Range(app))
+
+            If ((i <> dgv2.Rows.Count - 1) And (i <> 0)) Then
+                wSheet.Range(app).Borders(Microsoft.Office.Interop.Excel.XlBordersIndex.xlEdgeTop).Weight = Microsoft.Office.Interop.Excel.XlBorderWeight.xlThin
+            End If
+            If (i = dgv2.Rows.Count - 1) Then
+                wSheet.Range(app).Borders(Microsoft.Office.Interop.Excel.XlBordersIndex.xlEdgeBottom).Weight = Microsoft.Office.Interop.Excel.XlBorderWeight.xlThick
+            End If
+
+            For j = 0 To dgv2.Columns.Count - 1
+                ' Rimpiazza BoundField con DataGridViewColumn e accedi a HeaderText o DataPropertyName
+                Dim dataField As String = dgv2.Columns(j).DataPropertyName
+                If dataField.StartsWith("IS_BOLD") Then
+                    Dim inquinante = dataField.Split({"IS_BOLD_"}, StringSplitOptions.RemoveEmptyEntries)(0)
+                    currentExcelCol = wSheet.Range(inquinante + "_IC").Address.Split({"$"c}, StringSplitOptions.RemoveEmptyEntries)(0)
+                    app = currentExcelCol + Convert.ToString(i + firstRow) + ":" + currentExcelCol + Convert.ToString(i + firstRow)
+
+                    If Not ((section = 2) And (inquinante = "SO2")) Then
+                        Dim cellValue = Convert.ToInt16(dgv2.Rows(i).Cells(j).Value)
+                        wSheet.Range(app).Font.Bold = cellValue
+                        If cellValue = 1 Then
+                            wSheet.Range(app).Interior.Color = Color.Red
+                            wSheet.Range(app).Font.Color = Color.White
+                        Else
+                            wSheet.Range(app).Interior.Color = Color.White
+                            wSheet.Range(app).Font.Color = Color.Black
+                        End If
+                    End If
+                End If
+
+                ' Se non c'è il nome della colonna nel template corrispondente al nome sul DataGrid, salta la scrittura
+                Try
+                    col = wSheet.Range(dataField).Column
+                Catch ex As Exception
+                    Continue For
+                End Try
+
+                If dgv2.Rows(i).Cells(j).Value.ToString() = "&nbsp;" Then
+                    wSheet.Cells(i + firstRow, col) = ""
+                Else
+                    wSheet.Cells(i + firstRow, col) = dgv2.Rows(i).Cells(j).Value.ToString()
+                End If
+            Next
+        Next
+
+        ' Specchietto in basso (report mensile)
+        insert_tab = wSheet.Range("FIRSTROW_SUMMARY").Row
+
+        For z = 0 To dgv.Rows.Count - 1
+            dgv.ClearSelection()
+            dgv.Rows(z).Selected = True
+
+            For j = 0 To dgv.Columns.Count - 1
+                Try
+                    col = wSheet.Range("SUMM_" + dgv.Columns(j).DataPropertyName).Column
+                Catch ex As Exception
+                    Continue For
+                End Try
+
+                If dgv.Rows(z).Cells(j).Value.ToString() = "&nbsp;" Then
+                    wSheet.Cells(insert_tab + z, col) = ""
+                Else
+                    wSheet.Cells(insert_tab + z, col) = dgv.Rows(z).Cells(j).Value.ToString()
+                End If
+            Next
+        Next
+
+        ComboStatus.Report(State.FinishedReport)
+        excel.DisplayAlerts = False
+        Dim reportFileXls = reportTitle & ".xls"
+        Dim reportFilePdf = reportTitle & ".pdf"
+        Dim reportPath = Path.Combine(rootPath, "report", reportFileXls)
+        Dim reportPathPdf = Path.Combine(rootPath, "report", reportFilePdf)
+        excel.DisplayAlerts = False
+        wBook.SaveAs(reportPath, Microsoft.Office.Interop.Excel.XlFileFormat.xlWorkbookNormal, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, Microsoft.Office.Interop.Excel.XlSaveAsAccessMode.xlNoChange)
+        wSheet.PageSetup.PrintArea = "A1:Z60"
+        wSheet.PageSetup.PaperSize = Microsoft.Office.Interop.Excel.XlPaperSize.xlPaperA4
+        wSheet.PageSetup.Orientation = Microsoft.Office.Interop.Excel.XlPageOrientation.xlLandscape
+        wSheet.ExportAsFixedFormat(Microsoft.Office.Interop.Excel.XlFixedFormatType.xlTypePDF, reportPathPdf, Quality:=Microsoft.Office.Interop.Excel.XlFixedFormatQuality.xlQualityStandard, _
+                    IncludeDocProperties:=True, IgnorePrintAreas:=False, _
+                    OpenAfterPublish:=False)
+        ComboStatus.Report(State.FinishedReport)
+        If (startDate = endDate) Then
+            wBook.Close()
+            excel.DisplayAlerts = True
+            excel.Quit()
+
+            Marshal.ReleaseComObject(wSheet)
+            Marshal.ReleaseComObject(wBook)
+
+            Marshal.ReleaseComObject(excel)
+            wSheet = Nothing
+            wBook = Nothing
+            excel = Nothing
+            MySharedMethod.KillAllExcels()
+            System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.CreateSpecificCulture("it-IT")
+            ComboStatus.Report(State.Finished)
+            ShowCompletionDialog()
+        End If
+
+        dgv.ClearSelection()
 
     End Sub
 
