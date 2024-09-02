@@ -6,6 +6,7 @@ Imports System.Data.SqlClient
 Imports System.Runtime.InteropServices
 Imports System.Reflection
 
+
 Public Class Form1
 
     Dim connectionString As String
@@ -39,8 +40,6 @@ Public Class Form1
 
         connectionString = ConfigurationManager.ConnectionStrings("AQMSDBCONN").ConnectionString
         connectionStringCTE = ConfigurationManager.ConnectionStrings("AQMSDBCONNCTE").ConnectionString
-        Controls.Add(dgv)
-        Controls.Add(dgv2)
         ComboBox1.SelectedIndex = 0
         ComboBox2.SelectedIndex = 0
         TextBox1.Visible = False
@@ -53,14 +52,42 @@ Public Class Form1
 
     End Sub
 
+    Private Sub Button1_BindingContextChanged(sender As Object, e As EventArgs) Handles Button1.BindingContextChanged
+
+    End Sub
+
     Private Async Sub Button1_Click(sender As Object, e As EventArgs) Handles Button1.Click
 
         DisableForm()
         TextBox1.Visible = True
+        If (actualState = State.Finished) Then
+            TextBox1.Text = "Data Loading..."
+            Button1.Text = "Generate Report"
+        End If
         reportType = ComboBox2.SelectedIndex
         section = GetSection(ComboBox1.SelectedItem)
-        Dim startDate As New DateTime(DateTimePicker1.Value.Year, 1, 1)
-        Dim endDate As New DateTime(DateTimePicker2.Value.Year, 1, 1)
+        Dim exePath As String = Application.StartupPath
+        Dim rootPath As String = Directory.GetParent(Directory.GetParent(exePath).FullName).FullName
+        Dim chimneyName As String = MySharedMethod.GetChimneyName(Convert.ToInt16(section.ToString()))
+        Dim reportPath = Path.Combine(rootPath, "report", chimneyName)
+
+        If Not Directory.Exists(reportPath) Then
+            Directory.CreateDirectory(reportPath)
+        End If
+
+        Dim startDate As Date
+        Dim endDate As Date
+
+        If (reportType = 0) Then
+            startDate = New DateTime(DateTimePicker1.Value.Year, 1, 1)
+            endDate = New DateTime(DateTimePicker2.Value.Year, 1, 1)
+        ElseIf (reportType = 1) Then
+            startDate = New DateTime(DateTimePicker1.Value.Year, DateTimePicker1.Value.Month, 1)
+            endDate = New DateTime(DateTimePicker2.Value.Year, DateTimePicker2.Value.Month, 1)
+        Else
+            Return
+        End If
+
         ProgressBar1.Visible = True
         ProgressBar1.Maximum = 100
         TextBox1.Visible = True
@@ -84,7 +111,11 @@ Public Class Form1
                                                                    TextBox1.Text = "Sheet Creation..."
                                                                    actualState = State.SheetLoading
                                                                Case 4
-                                                                   TextBox1.Text = "Report year " & startDate.Year.ToString & " downloaded succesfully"
+                                                                   If (reportType = 0) Then
+                                                                       TextBox1.Text = "Year " & startDate.Year.ToString & " downloaded succesfully"
+                                                                   ElseIf (reportType = 1) Then
+                                                                       TextBox1.Text = "Month " & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MMMM yyyy}", Date.Parse(startDate)) & " downloaded succesfully"
+                                                                   End If
                                                                    actualState = State.FinishedReport
                                                                Case 5
                                                                    TextBox1.Text = "Report generation finished!"
@@ -94,6 +125,8 @@ Public Class Form1
                                                                    Me.Hide()
                                                            End Select
                                                        End Sub)                                             'Refresh the GUI when a change in the state occours
+        Controls.Add(dgv)
+        Controls.Add(dgv2)
 
         Dim dataTable1 As DataTable
         Dim dataTable2 As DataTable
@@ -112,6 +145,7 @@ Public Class Form1
                 If bolla = 0 Then
                     dataTable1 = Await Task.Run(Function() GetDataFlussi(barProgress, startDate, endDate, section, reportType, 1, dgv))   'Get the data from the database and assign to first data table structure. The function is runned in an other trhead in order to allow the GUI to refresh properly
                     dataTable2 = Await Task.Run(Function() GetDataFlussi(barProgress, startDate, endDate, section, reportType, 2, dgv2))  'Get the data from the database and assign to second data table structure
+                    preRenderTable(section)
                 Else
                     dataTable1 = Await Task.Run(Function() GetFirstBollaTable(barProgress, startDate, endDate, section, reportType, dgv))   'Get the data from the database and assign to first data table structure. The function is runned in an other trhead in order to allow the GUI to refresh properly
                     dataTable2 = Await Task.Run(Function() GetSecondBollaTable(barProgress, startDate, endDate, section, reportType, dgv2))  'Get the data from the database and assign to second data table structure
@@ -120,17 +154,19 @@ Public Class Form1
             Else
                 dataTable1 = Await Task.Run(Function() GetFirstCaminiTable(barProgress, startDate, endDate, section, reportType, dgv))
                 dataTable2 = Await Task.Run(Function() GetSecondCaminiTable(barProgress, startDate, endDate, section, reportType, dgv2))
+                preRenderTable(section)
             End If
 
-            If dataTable1 Is Nothing OrElse dataTable1.Rows.Count = 0 Then
-                MessageBox.Show("Nessun dato restituito o errore nella query", "Avviso", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            If dataTable1 Is Nothing Then
+                MessageBox.Show("Errore nell'acquisizione dei dati, consultare il file di log per i dettagli.", "Avviso", MessageBoxButtons.OK, MessageBoxIcon.Warning)
                 EnableForm()
                 Return
             Else
                 dgv.DataSource = dataTable1                                                                                     'Bind the data to the first DataGridView
             End If
-            If dataTable2 Is Nothing OrElse dataTable2.Rows.Count = 0 Then
-                MessageBox.Show("Nessun dato restituito o errore nella query.", "Avviso", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+
+            If dataTable2 Is Nothing Then
+                MessageBox.Show("Errore nell'acquisizione dei dati, consultare il file di log per i dettagli.", "Avviso", MessageBoxButtons.OK, MessageBoxIcon.Warning)
                 EnableForm()
                 Return
             Else
@@ -144,13 +180,15 @@ Public Class Form1
 
 
             If bolla = 0 Then
-                Await Task.Run(Sub() downloadReportFlussi(StatusProgress, startDate, endDate))                              'Download the reports of the selected years. The function is runned in an other trhead in order to allow the GUI to refresh properly 
+                Await Task.Run(Sub() downloadReportFlussi(StatusProgress, startDate, endDate, reportPath))                              'Download the reports of the selected years. The function is runned in an other trhead in order to allow the GUI to refresh properly 
 
             ElseIf bolla = 1 Then
-                Await Task.Run(Sub() downloadReportBolla(StatusProgress, startDate, endDate))
+                Await Task.Run(Sub() downloadReportBolla(StatusProgress, startDate, endDate, reportPath))
             Else
                 If reportType = 0 Then
-                    Await Task.Run(Sub() downloadYearlyReportCamini(StatusProgress, startDate, endDate))
+                    Await Task.Run(Sub() downloadYearlyReportCamini(StatusProgress, startDate, endDate, reportPath))
+                ElseIf reportType = 1 Then
+                    Await Task.Run(Sub() downloadMonthlyReportCamini(StatusProgress, startDate, endDate, reportPath))
                 End If
             End If
 
@@ -223,6 +261,7 @@ Public Class Form1
         Catch ex As Exception
             ' Gestione degli errori
             MessageBox.Show("Errore durante la connessione al database: " & ex.Message, "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            dt = Nothing
             Return dt
         End Try
 
@@ -316,8 +355,10 @@ Public Class Form1
                 testCMD.ExecuteScalar()
             Catch ex As Exception
                 Logger.LogError("[" & methodName & "]" & " Errore durante l'esecuzione della stored procedure: ", ex)
+                dt = Nothing
                 Return dt
             End Try
+
             ret = testCMD.Parameters("@retval").Value
             testCMD = New Data.SqlClient.SqlCommand("sp_AQMSNT_FILL_ARPA_MASSICI_CAMINI", connectionCTE)
             testCMD.CommandTimeout = 18000
@@ -338,8 +379,10 @@ Public Class Form1
                 testCMD.ExecuteScalar()
             Catch ex As Exception
                 Logger.LogError("[" & methodName & "]" & " Errore durante l'esecuzione della stored procedure: ", ex)
+                dt = Nothing
                 Return dt
             End Try
+
             ret2 = testCMD.Parameters("@retval").Value
             queryNumber += 3
             progress.Report(queryNumber * progressStep)
@@ -355,6 +398,7 @@ Public Class Form1
             reader = command.ExecuteReader()
         Catch ex As SqlException
             Logger.LogError("[" & methodName & "]" & " Errore durante l'esecuzione della query: ", ex)
+            dt = Nothing
             Return dt
 
         End Try
@@ -366,6 +410,7 @@ Public Class Form1
             reader2 = commandCTE.ExecuteReader()
         Catch ex As Exception
             Logger.LogError("[" & methodName & "]" & " Errore durante l'esecuzione della query: ", ex)
+            dt = Nothing
             Return dt
         End Try
 
@@ -517,45 +562,8 @@ Public Class Form1
             End If
         End If
 
-
-        For Each column As DataGridViewColumn In dgv.Columns
-            ' Verifica se il nome della colonna è nella lista delle colonne nascoste
-            If hiddenColumns.Contains(column.DataPropertyName) Then
-                column.Visible = False
-            End If
-        Next
-
-        If hiddenColumns.Count = 0 Then
-            For Each column As DataGridViewColumn In dgv.Columns
-                ' Verifica se il nome della colonna corrisponde ai nomi specificati
-                If column.DataPropertyName = "E9Q_NH3" Or column.DataPropertyName = "NH3_SOMMA" Or column.DataPropertyName = "NOX57_SOMMA" Then
-                    column.Visible = True
-                End If
-            Next
-        End If
-
         connection.Close()
         connectionCTE.Close()
-
-        'If whatTable = 2 Then
-        '    connectionCTE.Open()
-        '    logStatement = "DELETE FROM ARPA_WEB_MASSICI_CAMINI"
-
-        '    Using deleteCmd As New SqlCommand(logStatement, connectionCTE)
-
-        '        Try
-        '            deleteCmd.ExecuteNonQuery()
-
-        '        Catch ex As SqlException
-
-        '            Console.WriteLine("Errore durante l'esecuzione della query: " & ex.Message, "Errore SQL")
-
-        '        End Try
-
-        '    End Using
-
-        '    connectionCTE.Close()
-        'End If
 
         Return dt
     End Function
@@ -585,6 +593,7 @@ Public Class Form1
         Catch ex As Exception
             ' Gestione degli errori
             MessageBox.Show("Errore durante la connessione al database: " & ex.Message, "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            dt = Nothing
             Return dt
         End Try
 
@@ -638,6 +647,7 @@ Public Class Form1
             testCMD.ExecuteScalar()
         Catch ex As Exception
             Logger.LogError("[" & methodName & "]" & " Errore durante l'esecuzione della stored procedure: ", ex)
+            dt = Nothing
             Return dt
         End Try
 
@@ -655,6 +665,7 @@ Public Class Form1
             reader = command.ExecuteReader()
         Catch ex As SqlException
             Logger.LogError("[" & methodName & "]" & " Errore durante l'esecuzione della query: ", ex)
+            dt = Nothing
             Return dt
         End Try
 
@@ -762,20 +773,6 @@ Public Class Form1
             hiddenColumns.Add("NH3")
         End If
 
-
-        For Each column As DataGridViewColumn In dgv.Columns
-            If hiddenColumns.Contains(column.DataPropertyName) Then
-                column.Visible = False
-            End If
-        Next
-
-        ' Se hiddenColumns è vuoto, rende visibili tutte le colonne
-        If hiddenColumns.Count.Equals(0) Then
-            For Each column As DataGridViewColumn In dgv.Columns
-                column.Visible = True
-            Next
-        End If
-
         queryNumber += 1
         progress.Report(queryNumber * progressStep)
 
@@ -810,6 +807,7 @@ Public Class Form1
         Catch ex As Exception
             ' Gestione degli errori
             MessageBox.Show("Errore durante la connessione al database: " & ex.Message, "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            dt = Nothing
             Return dt
         End Try
 
@@ -866,15 +864,18 @@ Public Class Form1
 
         testCMD.Parameters.Add("@aia", Data.SqlDbType.Int, 11)
         testCMD.Parameters("@aia").Direction = Data.ParameterDirection.Input
-        testCMD.Parameters("@aia").Value = Int32.Parse(aia)
+        testCMD.Parameters("@aia").Value = aia
 
 
 
 
         testCMD.Parameters.Add("@IS_MESE", Data.SqlDbType.Int, 11)
         testCMD.Parameters("@IS_MESE").Direction = Data.ParameterDirection.Input
-        testCMD.Parameters("@IS_MESE").Value = 0
-
+        If type = 3 Then
+            testCMD.Parameters("@IS_MESE").Value = 0
+        ElseIf type = 2 Then
+            testCMD.Parameters("@IS_MESE").Value = 1
+        End If
         testCMD.Parameters.Add("@retval", Data.SqlDbType.BigInt, 8)
         testCMD.Parameters("@retval").Direction = Data.ParameterDirection.Output
         testCMD.Parameters.Add("@LL_GG_NOX", Data.SqlDbType.Float)
@@ -894,6 +895,7 @@ Public Class Form1
             testCMD.ExecuteScalar()
         Catch ex As Exception
             Logger.LogError("[" & methodName & "]" & " Errore durante l'esecuzione della stored procedure: ", ex)
+            dt = Nothing
             Return dt
         End Try
 
@@ -906,6 +908,7 @@ Public Class Form1
             reader = command.ExecuteReader()
         Catch ex As SqlException
             Logger.LogError("[" & methodName & "]" & " Errore durante l'esecuzione della query: ", ex)
+            dt = Nothing
             Return dt
         End Try
 
@@ -975,12 +978,6 @@ Public Class Form1
         End If
 
 
-        For Each column As DataGridViewColumn In dgv.Columns
-            If hiddenColumns.Contains(column.DataPropertyName) Then
-                column.Visible = False
-            End If
-        Next
-
         connection.Close()
 
         Return dt
@@ -1006,6 +1003,7 @@ Public Class Form1
         Catch ex As Exception
             ' Gestione degli errori
             MessageBox.Show("Errore durante la connessione al database: " & ex.Message, "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            dt = Nothing
             Return dt
         End Try
 
@@ -1067,6 +1065,7 @@ Public Class Form1
             testCMD.ExecuteScalar()
         Catch ex As Exception
             Logger.LogError("[" & methodName & "]" & " Errore durante l'esecuzione della stored procedure: ", ex)
+            dt = Nothing
             Return dt
         End Try
 
@@ -1083,6 +1082,7 @@ Public Class Form1
             reader = command.ExecuteReader()
         Catch ex As SqlException
             Logger.LogError("[" & methodName & "]" & " Errore durante l'esecuzione della query: ", ex)
+            dt = Nothing
             Return dt
         End Try
 
@@ -1222,6 +1222,7 @@ Public Class Form1
         Catch ex As Exception
             ' Gestione degli errori
             MessageBox.Show("Errore durante la connessione al database: " & ex.Message, "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            dt = Nothing
             Return dt
         End Try
 
@@ -1258,6 +1259,7 @@ Public Class Form1
             reader = command.ExecuteReader()
         Catch ex As SqlException
             Logger.LogError("[" & methodName & "]" & " Errore durante l'esecuzione della query: ", ex)
+            dt = Nothing
             Return dt
         End Try
 
@@ -1277,6 +1279,7 @@ Public Class Form1
             reader = command.ExecuteReader()
         Catch ex As SqlException
             Logger.LogError("[" & methodName & "]" & " Errore durante l'esecuzione della query: ", ex)
+            dt = Nothing
             Return dt
         End Try
 
@@ -1307,6 +1310,7 @@ Public Class Form1
             reader = command.ExecuteReader()
         Catch ex As SqlException
             Logger.LogError("[" & methodName & "]" & " Errore durante l'esecuzione della query: ", ex)
+            dt = Nothing
             Return dt
         End Try
 
@@ -1514,10 +1518,10 @@ Public Class Form1
 
     End Sub
 
-    Private Sub downloadReportFlussi(ComboStatus As IProgress(Of Integer), startDate As Date, endDate As Date)
+    Private Sub downloadReportFlussi(ComboStatus As IProgress(Of Integer), startDate As Date, endDate As Date, reportDir As String)
 
 
-        Dim excel As New Microsoft.Office.Interop.Excel.Application
+        Dim excel As New Microsoft.Office.Interop.Excel.ApplicationClass
         Dim wBook As Microsoft.Office.Interop.Excel.Workbook
         Dim wSheet As Microsoft.Office.Interop.Excel.Worksheet
         Dim templatePath As String
@@ -1538,7 +1542,7 @@ Public Class Form1
                 d2 = New Date(2020, mesenh3, 1)
         End Select
 
-        System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.CreateSpecificCulture("en-US")
+        'System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.CreateSpecificCulture("en-US")
 
         If (startDate >= d2) Then
             templatePath = Path.Combine(rootPath, "template", "E9_152_MESE_MASS_CAMINI.xls")
@@ -1561,7 +1565,7 @@ Public Class Form1
         Select Case reportType
             Case 0
                 wSheet.Range("NomeTabella").Value = "152 MASSICO ANNUALE CAMINI DI RAFFINERIA"
-                wSheet.Range("IntervalloDate").Value = "Report Annuale dell'anno " + Date.Parse(startDate, New System.Globalization.CultureInfo("it-IT")).Year.ToString()
+                wSheet.Range("IntervalloDate").Value = "Report Annuale dell'anno " + startDate.Year.ToString()
                 wSheet.Range("B8").Value = "Mese"
                 If (startDate >= d2) Then
                     wSheet.Range("NOTA_FRASE").Value = "Parametro NH3 disponibile sul camino E9 dal mese di Ottobre 2020 a seguito del completamento dei test funzionali, in ottemperanza alla prescrizione [43] dell’AIA DM92/2018"
@@ -1569,9 +1573,11 @@ Public Class Form1
                     wSheet.Range("NOTA_FRASE").Value = ""
                 End If
             Case 1
-                ' TODO
-            Case 2
-                ' TODO
+                wSheet.Range("NomeTabella").Value = "152 MASSICO MENSILE CAMINI DI RAFFINERIA"
+                wSheet.Range("IntervalloDate").Value = "Report Mensile di " + String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MMMM yyyy}", Date.Parse(startDate))
+                reportTitle = "152_MASSICO_MESE_" & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MMMM_yyyy}", Date.Parse(startDate))
+                wSheet.Range("B8").Value = "Giorno"
+                wSheet.Range("NOTA_FRASE").Value = ""
         End Select
 
         wSheet.Range("NomeTabella").Font.Bold = True
@@ -1627,12 +1633,12 @@ Public Class Form1
                 Else
                     If i = 2 Then
                         ' Se è la terza riga, formato ORA
-                        Dim cellDateTime As DateTime
-                        If DateTime.TryParse(cellValue, cellDateTime) Then
-                            wSheet.Cells(rowIndex, kk) = cellDateTime.ToString("HH.mm")
-                        Else
-                            wSheet.Cells(rowIndex, kk) = cellValue
-                        End If
+                        'Dim cellDateTime As DateTime
+                        'If DateTime.TryParse(cellValue, cellDateTime) Then
+                        wSheet.Cells(rowIndex, kk) = String.Format("{0:HH.mm}", currentRow.Cells(kk).Value)
+                        'Else
+                        'wSheet.Cells(rowIndex, kk) = cellValue
+                        'End If
                     Else
                         If startDate < d2 AndAlso kk >= 38 Then
                             wSheet.Cells(rowIndex, kk) = currentRow.Cells(kk + 1).Value.ToString()
@@ -1791,75 +1797,79 @@ Public Class Form1
                     End If
                 Next
             Next
-        End If
 
-        ComboStatus.Report(State.SheetLoading)
-        For ep = 0 To dgv.Rows.Count - 1
-            ' Ottieni la riga corrente usando l'indice ep
-            Dim currentRow As DataGridViewRow = dgv.Rows(ep)
 
-            ' Calcola l'intervallo di celle da formattare
-            app = "L" & (ep + 36).ToString() & ":Q" & (ep + 36).ToString()
-            wSheet.Range(app).NumberFormat = "@"
-            wSheet.Range(app).BorderAround()
-            wSheet.Range(app).Borders.Weight = 2 ' Usa numeri per pesi dei bordi, non stringhe
+            ComboStatus.Report(State.SheetLoading)
+            For ep = 0 To dgv.Rows.Count - 1
+                ' Ottieni la riga corrente usando l'indice ep
+                Dim currentRow As DataGridViewRow = dgv.Rows(ep)
 
-            ' Copia e incolla le aree specifiche
-            wSheet.Range("B8:G9").Copy()
-            wSheet.Range("L34").PasteSpecial() ' Usa PasteSpecial per maggiore controllo
+                ' Calcola l'intervallo di celle da formattare
+                app = "L" & (ep + 36).ToString() & ":Q" & (ep + 36).ToString()
+                wSheet.Range(app).NumberFormat = "@"
+                wSheet.Range(app).BorderAround()
+                wSheet.Range(app).Borders.Weight = 2 ' Usa numeri per pesi dei bordi, non stringhe
 
-            wSheet.Range("C35:G35").Copy()
-            wSheet.Range("M35").PasteSpecial()
+                ' Copia e incolla le aree specifiche
+                wSheet.Range("B8:G9").Copy()
+                wSheet.Range("L34").PasteSpecial() ' Usa PasteSpecial per maggiore controllo
 
-            ' Imposta i valori specifici nelle celle
-            wSheet.Range("M34").Value = "CAMINO E3"
-            wSheet.Range("N35").Value = "SO2(Ton)"
-            wSheet.Range("Q35").Value = "COT(Ton)"
+                wSheet.Range("C35:G35").Copy()
+                wSheet.Range("M35").PasteSpecial()
 
-            For kk = 12 To 17
-                Dim cellValue As String = String.Empty
+                ' Imposta i valori specifici nelle celle
+                wSheet.Range("M34").Value = "CAMINO E3"
+                wSheet.Range("N35").Value = "SO2(Ton)"
+                wSheet.Range("Q35").Value = "COT(Ton)"
 
-                ' Verifica se la cella è nulla o contiene un valore e assegnalo a cellValue
-                If currentRow.Cells(kk).Value IsNot Nothing Then
-                    cellValue = currentRow.Cells(kk).Value.ToString()
-                End If
+                For kk = 12 To 17
+                    Dim cellValue As String = String.Empty
 
-                If String.IsNullOrEmpty(cellValue) OrElse cellValue = "&nbsp;" Then
-                    wSheet.Cells(ep + 36, kk) = ""
-                Else
-                    ' Copia il valore della cella alla riga successiva
-                    wSheet.Cells(ep + 36, kk).Copy()
-                    wSheet.Cells(ep + 37, kk).PasteSpecial()
+                    ' Verifica se la cella è nulla o contiene un valore e assegnalo a cellValue
+                    If currentRow.Cells(kk).Value IsNot Nothing Then
+                        cellValue = currentRow.Cells(kk).Value.ToString()
+                    End If
 
-                    ' Imposta valori specifici
-                    wSheet.Cells(ep + 37, 12).Value = "VLE"
-                    wSheet.Cells(ep + 37, 13).Value = 750
-                    wSheet.Cells(ep + 37, 14).Value = 400
-                    wSheet.Cells(ep + 37, 15).Value = 10
-                    wSheet.Cells(ep + 37, 16).Value = "N.A"
-                    wSheet.Cells(ep + 37, 17).Value = "N.A"
-
-                    ' Formattazione per la colonna ORA
-                    If kk = 12 Then ' ORA
-                        wSheet.Cells(ep + 36, kk).Value = String.Format("{0:HH.mm}", currentRow.Cells(2).Value)
-                        wSheet.Cells(ep + 36, kk).Font.Bold = True
+                    If String.IsNullOrEmpty(cellValue) OrElse cellValue = "&nbsp;" Then
+                        wSheet.Cells(ep + 36, kk) = ""
+                    Else
+                        ' Copia il valore della cella alla riga successiva
                         wSheet.Cells(ep + 36, kk).Copy()
                         wSheet.Cells(ep + 37, kk).PasteSpecial()
-                    Else
-                        ' Mostra il numero con due cifre decimali
-                        wSheet.Cells(ep + 36, kk).Value = String.Format("{0:0.00}", (Convert.ToDouble(currentRow.Cells(kk).Value) / 1000))
 
-                        ' Colore grigio per la riga somma annuale
-                        If ep = dgv.Rows.Count - 1 Then
-                            wSheet.Cells(ep + 36, 12).Interior.Color = Color.LightGray
-                            wSheet.Cells(ep + 36, kk).Interior.Color = Color.LightGray
-                            wSheet.Cells(ep + 37, kk).Font.Bold = True
+                        ' Imposta valori specifici
+                        wSheet.Cells(ep + 37, 12).Value = "VLE"
+                        wSheet.Cells(ep + 37, 13).Value = 750
+                        wSheet.Cells(ep + 37, 14).Value = 400
+                        wSheet.Cells(ep + 37, 15).Value = 10
+                        wSheet.Cells(ep + 37, 16).Value = "N.A"
+                        wSheet.Cells(ep + 37, 17).Value = "N.A"
+
+                        ' Formattazione per la colonna ORA
+                        If kk = 12 Then ' ORA
+                            wSheet.Cells(ep + 36, kk).Value = String.Format("{0:HH.mm}", currentRow.Cells(2).Value)
+                            wSheet.Cells(ep + 36, kk).Font.Bold = True
+                            wSheet.Cells(ep + 36, kk).Copy()
+                            wSheet.Cells(ep + 37, kk).PasteSpecial()
+                        Else
+                            ' Mostra il numero con due cifre decimali
+                            Dim doubleVal As Double
+                            If (Double.TryParse(currentRow.Cells(kk).Value.ToString(), doubleVal)) Then
+                                wSheet.Cells(ep + 36, kk).Value = String.Format("{0:0.00}", (doubleVal) / 1000)
+                            Else
+                                wSheet.Cells(ep + 36, kk).Value = currentRow.Cells(kk).Value
+                            End If
+                            ' Colore grigio per la riga somma annuale
+                            If ep = dgv.Rows.Count - 1 Then
+                                wSheet.Cells(ep + 36, 12).Interior.Color = Color.LightGray
+                                wSheet.Cells(ep + 36, kk).Interior.Color = Color.LightGray
+                                wSheet.Cells(ep + 37, kk).Font.Bold = True
+                            End If
                         End If
                     End If
-                End If
+                Next
             Next
-        Next
-
+        End If
 
         Dim cellOffset As Integer = tabspace
         ' Dim stringa As String
@@ -1885,73 +1895,74 @@ Public Class Form1
 
             app = "C" & i + cellOffset & ":G" & i + cellOffset
             wSheet.Range(app).BorderAround()
-            If (Not (dontMerge)) Then
-                wSheet.Range(app).Merge()
-            End If
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "H" & i + cellOffset & ":L" & i + cellOffset
-            wSheet.Range(app).BorderAround()
-            If (Not (dontMerge)) Then
-                wSheet.Range(app).Merge()
-            End If
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "M" & i + cellOffset & ":Q" & i + cellOffset
-            wSheet.Range(app).BorderAround()
-            If (Not (dontMerge)) Then
-                wSheet.Range(app).Merge()
-            End If
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "R" & i + cellOffset & ":V" & i + cellOffset
-            wSheet.Range(app).BorderAround()
-            If (Not (dontMerge)) Then
-                wSheet.Range(app).Merge()
-            End If
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "W" & i + cellOffset & ":AA" & i + cellOffset
-            wSheet.Range(app).BorderAround()
-            If (Not (dontMerge)) Then
-                wSheet.Range(app).Merge()
-            End If
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            app = "AB" & i + cellOffset & ":AF" & i + cellOffset
-            wSheet.Range(app).BorderAround()
-            If (Not (dontMerge)) Then
-                wSheet.Range(app).Merge()
-            End If
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            If (startDate >= d2) Then
-                app = "AG" & i + cellOffset & ":AL" & i + cellOffset
-            Else
-                app = "AG" & i + cellOffset & ":AK" & i + cellOffset
-            End If
+            Try
+                If (Not (dontMerge)) Then
+                    wSheet.Range(app).Merge()
+                End If
+                wSheet.Range(app).HorizontalAlignment = -4108
+                wSheet.Range(app).VerticalAlignment = -4108
+                app = "H" & i + cellOffset & ":L" & i + cellOffset
+                wSheet.Range(app).BorderAround()
+                If (Not (dontMerge)) Then
+                    wSheet.Range(app).Merge()
+                End If
+                wSheet.Range(app).HorizontalAlignment = -4108
+                wSheet.Range(app).VerticalAlignment = -4108
+                app = "M" & i + cellOffset & ":Q" & i + cellOffset
+                wSheet.Range(app).BorderAround()
+                If (Not (dontMerge)) Then
+                    wSheet.Range(app).Merge()
+                End If
+                wSheet.Range(app).HorizontalAlignment = -4108
+                wSheet.Range(app).VerticalAlignment = -4108
+                app = "R" & i + cellOffset & ":V" & i + cellOffset
+                wSheet.Range(app).BorderAround()
+                If (Not (dontMerge)) Then
+                    wSheet.Range(app).Merge()
+                End If
+                wSheet.Range(app).HorizontalAlignment = -4108
+                wSheet.Range(app).VerticalAlignment = -4108
+                app = "W" & i + cellOffset & ":AA" & i + cellOffset
+                wSheet.Range(app).BorderAround()
+                If (Not (dontMerge)) Then
+                    wSheet.Range(app).Merge()
+                End If
+                wSheet.Range(app).HorizontalAlignment = -4108
+                wSheet.Range(app).VerticalAlignment = -4108
+                app = "AB" & i + cellOffset & ":AF" & i + cellOffset
+                wSheet.Range(app).BorderAround()
+                If (Not (dontMerge)) Then
+                    wSheet.Range(app).Merge()
+                End If
+                wSheet.Range(app).HorizontalAlignment = -4108
+                wSheet.Range(app).VerticalAlignment = -4108
+                If (startDate >= d2) Then
+                    app = "AG" & i + cellOffset & ":AL" & i + cellOffset
+                Else
+                    app = "AG" & i + cellOffset & ":AK" & i + cellOffset
+                End If
 
-            wSheet.Range(app).BorderAround()
-            If (Not (dontMerge)) Then
-                wSheet.Range(app).Merge()
-            End If
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
-            If (startDate >= d2) Then
-                app = "AM" & i + cellOffset & ":AQ" & i + cellOffset
-            Else
-                app = "AL" & i + cellOffset & ":AP" & i + cellOffset
-            End If
-            wSheet.Range(app).BorderAround()
-            If (Not (dontMerge)) Then
-                wSheet.Range(app).Merge()
-            End If
-            wSheet.Range(app).HorizontalAlignment = -4108
-            wSheet.Range(app).VerticalAlignment = -4108
+                wSheet.Range(app).BorderAround()
+                If (Not (dontMerge)) Then
+                    wSheet.Range(app).Merge()
+                End If
+                wSheet.Range(app).HorizontalAlignment = -4108
+                wSheet.Range(app).VerticalAlignment = -4108
+                If (startDate >= d2) Then
+                    app = "AM" & i + cellOffset & ":AQ" & i + cellOffset
+                Else
+                    app = "AL" & i + cellOffset & ":AP" & i + cellOffset
+                End If
+                wSheet.Range(app).BorderAround()
+                If (Not (dontMerge)) Then
+                    wSheet.Range(app).Merge()
+                End If
+                wSheet.Range(app).HorizontalAlignment = -4108
+                wSheet.Range(app).VerticalAlignment = -4108
 
-
-            'tabella secondaria 43
-            'riga)
+            Catch ex As Exception
+                Logger.LogWarning(" Error while merging cells", ex)
+            End Try
 
             For kk = 2 To 43
 
@@ -1983,8 +1994,8 @@ Public Class Form1
 
         Dim reportFileXls = reportTitle & ".xls"
         Dim reportFilePdf = reportTitle & ".pdf"
-        Dim reportPath = Path.Combine(rootPath, "report", reportFileXls)
-        Dim reportPathPdf = Path.Combine(rootPath, "report", reportFilePdf)
+        Dim reportPath = Path.Combine(reportDir, reportFileXls)
+        Dim reportPathPdf = Path.Combine(reportDir, reportFilePdf)
         excel.DisplayAlerts = False
         wBook.SaveAs(reportPath, Microsoft.Office.Interop.Excel.XlFileFormat.xlWorkbookNormal, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, Microsoft.Office.Interop.Excel.XlSaveAsAccessMode.xlNoChange)
         wSheet.PageSetup.PrintArea = "A1:Z60"
@@ -1994,20 +2005,21 @@ Public Class Form1
                     IncludeDocProperties:=True, IgnorePrintAreas:=False, _
                     OpenAfterPublish:=False)
         ComboStatus.Report(State.FinishedReport)
+        wBook.Close()
+        excel.DisplayAlerts = True
+        excel.Quit()
+
+        Marshal.ReleaseComObject(wSheet)
+        Marshal.ReleaseComObject(wBook)
+
+        Marshal.ReleaseComObject(excel)
+        wSheet = Nothing
+        wBook = Nothing
+        excel = Nothing
+        MySharedMethod.KillAllExcels()
+
         If (startDate = endDate) Then
-            wBook.Close()
-            excel.DisplayAlerts = True
-            excel.Quit()
 
-            Marshal.ReleaseComObject(wSheet)
-            Marshal.ReleaseComObject(wBook)
-
-            Marshal.ReleaseComObject(excel)
-            wSheet = Nothing
-            wBook = Nothing
-            excel = Nothing
-            MySharedMethod.KillAllExcels()
-            System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.CreateSpecificCulture("it-IT")
             ComboStatus.Report(State.Finished)
             ShowCompletionDialog()
         End If
@@ -2016,9 +2028,9 @@ Public Class Form1
 
     End Sub
 
-    Private Sub downloadReportBolla(ComboStatus As IProgress(Of Integer), startDate As Date, endDate As Date)
+    Private Sub downloadReportBolla(ComboStatus As IProgress(Of Integer), startDate As Date, endDate As Date, reportDir As String)
 
-        Dim excel As New Microsoft.Office.Interop.Excel.Application
+        Dim excel As New Microsoft.Office.Interop.Excel.ApplicationClass
         Dim wBook As Microsoft.Office.Interop.Excel.Workbook
         Dim wSheet As Microsoft.Office.Interop.Excel.Worksheet
         Dim exePath As String = Application.StartupPath
@@ -2046,9 +2058,11 @@ Public Class Form1
                 wSheet.Cells(2, 8).Value = "MESE"
                 reportTitle = "152_BOLLA_ANNO_" & startDate.Year.ToString()
             Case 1
-                ' TODO
-            Case 2
-                ' TODO
+
+                wSheet.Range("NomeTabella").Value = "152 CONCENTRAZIONI MENSILI CAMINI DI RAFFINERIA"
+                wSheet.Range("IntervalloDate").Value = "Report Mensile di " + String.Format(New CultureInfo("it-IT", False), "{0:MMMM yyyy}", DateTime.Parse(startDate, New CultureInfo("it-IT", False)))
+                wSheet.Cells(2, 8).Value = "GIORNO"
+                reportTitle = "152_BOLLA_MESE_" & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MMMM_yyyy}", Date.Parse(startDate))
         End Select
 
 
@@ -2171,6 +2185,9 @@ Public Class Form1
         For i = Math.Max(dgv.Rows.Count, 0) To dgv.Rows.Count - 1
             dgv.ClearSelection()
             dgv.Rows(i).Selected = True ' Seleziona la riga corrente
+            If (((dgv.Rows(i).Cells(2).Value.ToString().Contains("Sup")) Or (dgv.Rows(i).Cells(2).Value.ToString().Contains("VLE")))) Then
+                Continue For
+            End If
 
             app = "B" & i + cellOffset
             wSheet.Range(app).BorderAround()
@@ -2252,8 +2269,8 @@ Public Class Form1
         excel.DisplayAlerts = False
         Dim reportFileXls = reportTitle & ".xls"
         Dim reportFilePdf = reportTitle & ".pdf"
-        Dim reportPath = Path.Combine(rootPath, "report", reportFileXls)
-        Dim reportPathPdf = Path.Combine(rootPath, "report", reportFilePdf)
+        Dim reportPath = Path.Combine(reportDir, reportFileXls)
+        Dim reportPathPdf = Path.Combine(reportDir, reportFilePdf)
         excel.DisplayAlerts = False
         wBook.SaveAs(reportPath, Microsoft.Office.Interop.Excel.XlFileFormat.xlWorkbookNormal, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, Microsoft.Office.Interop.Excel.XlSaveAsAccessMode.xlNoChange)
         wSheet.PageSetup.PrintArea = "A1:Z60"
@@ -2262,30 +2279,30 @@ Public Class Form1
         wSheet.ExportAsFixedFormat(Microsoft.Office.Interop.Excel.XlFixedFormatType.xlTypePDF, reportPathPdf, Quality:=Microsoft.Office.Interop.Excel.XlFixedFormatQuality.xlQualityStandard, _
                     IncludeDocProperties:=True, IgnorePrintAreas:=False, _
                     OpenAfterPublish:=False)
+        wBook.Close()
+        excel.DisplayAlerts = True
+        excel.Quit()
+
+        Marshal.ReleaseComObject(wSheet)
+        Marshal.ReleaseComObject(wBook)
+
+        Marshal.ReleaseComObject(excel)
+        wSheet = Nothing
+        wBook = Nothing
+        excel = Nothing
+        MySharedMethod.KillAllExcels()
         ComboStatus.Report(State.FinishedReport)
+
         If (startDate = endDate) Then
-            wBook.Close()
-            excel.DisplayAlerts = True
-            excel.Quit()
-
-            Marshal.ReleaseComObject(wSheet)
-            Marshal.ReleaseComObject(wBook)
-
-            Marshal.ReleaseComObject(excel)
-            wSheet = Nothing
-            wBook = Nothing
-            excel = Nothing
-            MySharedMethod.KillAllExcels()
-            System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.CreateSpecificCulture("it-IT")
             ComboStatus.Report(State.Finished)
             ShowCompletionDialog()
         End If
 
     End Sub
 
-    Private Sub downloadYearlyReportCamini(ComboStatus As IProgress(Of Integer), startDate As Date, endDate As Date)
+    Private Sub downloadYearlyReportCamini(ComboStatus As IProgress(Of Integer), startDate As Date, endDate As Date, reportDir As String)
 
-        Dim excel As New Microsoft.Office.Interop.Excel.Application
+        Dim excel As New Microsoft.Office.Interop.Excel.ApplicationClass
         Dim wBook As Microsoft.Office.Interop.Excel.Workbook
         Dim wSheet As Microsoft.Office.Interop.Excel.Worksheet
         Dim exePath As String = Application.StartupPath
@@ -2300,7 +2317,7 @@ Public Class Form1
             wBook = excel.Workbooks.Open(Path.Combine(rootPath, "template", "E9_152_CONC_ANNO_TARANTO_RAFF_COV.xls"))
         Else
 
-            wBook = excel.Workbooks.Open(Path.Combine(rootPath, "template", "152_GIORNO_BOLLA_CAMINI.xls"))
+            wBook = excel.Workbooks.Open(Path.Combine(rootPath, "template", "152_CONC_ANNO_TARANTO_RAFF_COV.xls"))
 
         End If
 
@@ -2328,11 +2345,11 @@ Public Class Form1
         wSheet.Range("TitoloTabella").Font.Bold = True
         wSheet.Range("IntervalloDate").Value = "Report Annuale Anno " & startDate.Year
         wSheet.Range("IntervalloDate").Font.Bold = True
-        'wSheet.Range("HNF").Value = hnf
-        'wSheet.Range("HNF").Font.Bold = True
-        'wSheet.Range("HTRANS").Value = htran
-        'wSheet.Range("HTRANS").Font.Bold = True
-        reportTitle = MySharedMethod.GetChimneyName(Convert.ToInt16(section.ToString())) & "_CONC_ANNO" & startDate.Year
+        wSheet.Range("HNF").Value = hnf
+        wSheet.Range("HNF").Font.Bold = True
+        wSheet.Range("HTRANS").Value = htran
+        wSheet.Range("HTRANS").Font.Bold = True
+        reportTitle = MySharedMethod.GetChimneyName(Convert.ToInt16(section.ToString())) & "_CONC_ANNO_" & startDate.Year
 
         If (startDate.Year < 2018) Then
             percentuale = "- Dlgs 152 (70%)"
@@ -2468,8 +2485,8 @@ Public Class Form1
         excel.DisplayAlerts = False
         Dim reportFileXls = reportTitle & ".xls"
         Dim reportFilePdf = reportTitle & ".pdf"
-        Dim reportPath = Path.Combine(rootPath, "report", reportFileXls)
-        Dim reportPathPdf = Path.Combine(rootPath, "report", reportFilePdf)
+        Dim reportPath = Path.Combine(reportDir, reportFileXls)
+        Dim reportPathPdf = Path.Combine(reportDir, reportFilePdf)
         excel.DisplayAlerts = False
         wBook.SaveAs(reportPath, Microsoft.Office.Interop.Excel.XlFileFormat.xlWorkbookNormal, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, Microsoft.Office.Interop.Excel.XlSaveAsAccessMode.xlNoChange)
         wSheet.PageSetup.PrintArea = "A1:Z60"
@@ -2501,6 +2518,221 @@ Public Class Form1
 
     End Sub
 
+    Private Sub downloadMonthlyReportCamini(ComboStatus As IProgress(Of Integer), startDate As Date, endDate As Date, reportDir As String)
+
+        Dim excel As New Microsoft.Office.Interop.Excel.ApplicationClass
+        Dim wBook As Microsoft.Office.Interop.Excel.Workbook
+        Dim wSheet As Microsoft.Office.Interop.Excel.Worksheet
+        Dim exePath As String = Application.StartupPath
+        Dim rootPath As String = Directory.GetParent(Directory.GetParent(exePath).FullName).FullName
+        Dim reportTitle As String = ""
+        Dim d2 As Date = New Date(2020, mesenh3, 1)
+        Dim templateName As String = ""
+        System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.CreateSpecificCulture("en-US")
+
+
+
+        If section = 6 AndAlso aia = 1 AndAlso startDate >= d2 Then
+            templateName = "E9_152_CONC_MESE_TARANTO_RAFF_COV.xls"
+        ElseIf section = 7 Then
+            templateName = "152_CONC_MESE_TARANTO_RAFF_COV_NO_GIC.xls"
+        ElseIf section = 3 OrElse section = 4 Then
+            If aia = 0 Then
+                templateName = "152_CONC_MESE_TARANTO_RAFF_COV_NO_GIC.xls"
+            ElseIf aia = 1 Then
+                templateName = "4_7152_CONC_MESE_TARANTO_RAFF_COV.xls"
+            End If
+        Else
+            templateName = "152_CONC_MESE_TARANTO_RAFF_COV.xls"
+        End If
+
+        wBook = excel.Workbooks.Open(Path.Combine(rootPath, "template", templateName))
+        wSheet = wBook.ActiveSheet()
+
+        Dim percentuale As String
+
+        Dim DataCambioPercentuale As Date
+        Dim DataScelta As Date
+
+        DataCambioPercentuale = New Date(2018, 11, 1)
+
+        DataScelta = New Date(startDate.Year, startDate.Month, 1)
+        Dim compara As Integer = DateTime.Compare(DataCambioPercentuale, DataScelta)
+
+
+
+        If (compara = 0 Or compara < 0) Then
+            percentuale = " "
+
+        Else
+            percentuale = "- Dlgs 152 (70%)"
+        End If
+
+        wSheet.Range("NomeTabella").Value = "152_CONC_MESE"
+        wSheet.Range("NomeTabella").Font.Bold = True
+        wSheet.Range("NomeCentrale").Value = "ENI R&M - Raffineria di Taranto - CAMINO " & MySharedMethod.GetChimneyName(section.ToString())
+        wSheet.Range("NomeCentrale").Font.Bold = True
+        wSheet.Range("SisMisura").Value = "Sistema di Monitoraggio delle Emissioni"
+        wSheet.Range("SisMisura").Font.Bold = True
+        wSheet.Range("TitoloTabella").Value = "Report Mensile concentrazioni medie giornaliere (Nox,Co,So2,Polveri,Cov) " & percentuale.ToString()
+        If (startDate > datanh3 And section = 6) Then
+            wSheet.Range("TitoloTabella").Value = "Report Mensile concentrazioni medie giornaliere (Nox,Co,So2,Polveri,Cov ,NH3) " & percentuale.ToString()
+
+        End If
+
+        wSheet.Range("TitoloTabella").Font.Bold = True
+        wSheet.Range("IntervalloDate").Value = "Report Mensile del Mese di " & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MMMM yyyy}", Date.Parse(startDate, New System.Globalization.CultureInfo("it-IT")))
+        wSheet.Range("IntervalloDate").Font.Bold = True
+
+        wSheet.Range("HNF").Value = hnf
+        wSheet.Range("HNF").Font.Bold = True
+        wSheet.Range("HTRANS").Value = htran
+        wSheet.Range("HTRANS").Font.Bold = True
+        reportTitle = MySharedMethod.GetChimneyName(Convert.ToInt16(section.ToString())) & "_CONC_" & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MMMM_yyyy}", Date.Parse(startDate))
+        If (section <> 2) Then
+            Try
+                wSheet.Range("NOTA_E2").Value = ""
+            Catch ex As Exception
+
+            End Try
+        End If
+
+        Dim i As Integer
+        Dim j As Integer
+
+        Dim app As String
+        Dim col As Integer
+        Dim insert_tab As Integer
+        Dim firstRow As Integer
+        Dim firstColumn As String
+        Dim lastColumn As String
+        Dim currentExcelCol As String
+
+        firstRow = wSheet.Range("FirstRow").Row
+        firstColumn = wSheet.Range("FIRST_COLUMN").Address.Split({"$"c}, StringSplitOptions.RemoveEmptyEntries)(0)
+        lastColumn = wSheet.Range("LAST_COLUMN").Address.Split({"$"c}, StringSplitOptions.RemoveEmptyEntries)(0)
+
+        For i = 0 To dgv2.Rows.Count - 1
+            ' Seleziona la riga corrente
+            dgv2.ClearSelection()
+            dgv2.Rows(i).Selected = True
+
+            app = firstColumn & (i + firstRow).ToString & ":" & lastColumn & (i + firstRow).ToString
+            wSheet.Rows(firstRow + i + 1).Insert()
+            wSheet.Range(firstColumn & firstRow & ":" & lastColumn & firstRow).Copy(wSheet.Range(app))
+
+            If ((i <> dgv2.Rows.Count - 1) And (i <> 0)) Then
+                wSheet.Range(app).Borders(Microsoft.Office.Interop.Excel.XlBordersIndex.xlEdgeTop).Weight = Microsoft.Office.Interop.Excel.XlBorderWeight.xlThin
+            End If
+            If (i = dgv2.Rows.Count - 1) Then
+                wSheet.Range(app).Borders(Microsoft.Office.Interop.Excel.XlBordersIndex.xlEdgeBottom).Weight = Microsoft.Office.Interop.Excel.XlBorderWeight.xlThick
+            End If
+
+            For j = 0 To dgv2.Columns.Count - 1
+                ' Rileva il nome della colonna tramite il tag o il nome del DataGridViewColumn
+                Dim columnName As String = dgv2.Columns(j).Name
+
+                If columnName.StartsWith("IS_BOLD") Then
+                    Dim inquinante = columnName.Split({"IS_BOLD_"}, StringSplitOptions.RemoveEmptyEntries)(0)
+                    currentExcelCol = wSheet.Range(inquinante + "_IC").Address.Split({"$"c}, StringSplitOptions.RemoveEmptyEntries)(0)
+                    app = currentExcelCol + Convert.ToString(i + firstRow) + ":" + currentExcelCol + Convert.ToString(i + firstRow)
+
+                    If Not ((section = 2) And (inquinante = "SO2")) Then
+                        Dim cellValue As Integer = Convert.ToInt16(dgv2.Rows(i).Cells(j).Value)
+
+                        If cellValue = 1 Then
+                            wSheet.Range(app).Font.Bold = True
+                            wSheet.Range(app).Interior.Color = Color.Red
+                            wSheet.Range(app).Font.Color = Color.White
+                        Else
+                            wSheet.Range(app).Interior.Color = Color.White
+                            wSheet.Range(app).Font.Bold = False
+                            wSheet.Range(app).Font.Color = Color.Black
+                        End If
+                    End If
+                End If
+
+                ' SE NON C'E' IL NOME DI COLONNA SUL TEMPLATE CORRISPONDENTE AL NOME SUL DATAGRID SALTA LA SCRITTURA SU TEMPLATE
+                Try
+                    col = wSheet.Range(columnName).Column
+                Catch ex As Exception
+                    Continue For
+                End Try
+
+                Dim cellText As String = If(dgv2.Rows(i).Cells(j).Value Is Nothing, "", dgv2.Rows(i).Cells(j).Value.ToString())
+
+                If cellText = "&nbsp;" Then
+                    wSheet.Cells(i + firstRow, col) = ""
+                Else
+                    wSheet.Cells(i + firstRow, col) = cellText
+                End If
+            Next
+        Next
+
+        ' specchietto in basso (report mensile)
+        insert_tab = wSheet.Range("FIRSTROW_SUMMARY").Row
+
+        For z = 0 To dgv.Rows.Count - 1
+            dgv.ClearSelection()
+            dgv.Rows(z).Selected = True
+            For j = 0 To dgv.Columns.Count - 1
+                ' SE NON C'E' IL NOME DI COLONNA SUL TEMPLATE CORRISPONDENTE AL NOME SUL DATAGRID SALTA LA SCRITTURA SU TEMPLATE
+                Try
+                    col = wSheet.Range("SUMM_" + dgv.Columns(j).Name).Column
+                Catch ex As Exception
+                    Continue For
+                End Try
+
+                Dim cellText As String = If(dgv.Rows(z).Cells(j).Value Is Nothing, "", dgv.Rows(z).Cells(j).Value.ToString())
+
+                If cellText = "&nbsp;" Then
+                    wSheet.Cells(insert_tab + z, col) = ""
+                Else
+                    wSheet.Cells(insert_tab + z, col) = cellText
+                End If
+            Next
+        Next
+
+        ComboStatus.Report(State.FinishedReport)
+        excel.DisplayAlerts = False
+        Dim reportFileXls = reportTitle & ".xls"
+        Dim reportFilePdf = reportTitle & ".pdf"
+        Dim reportPath = Path.Combine(reportDir, reportFileXls)
+        Dim reportPathPdf = Path.Combine(reportDir, reportFilePdf)
+        excel.DisplayAlerts = False
+        wBook.SaveAs(reportPath, Microsoft.Office.Interop.Excel.XlFileFormat.xlWorkbookNormal, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, Microsoft.Office.Interop.Excel.XlSaveAsAccessMode.xlNoChange)
+        wSheet.PageSetup.PrintArea = "A1:Z60"
+        wSheet.PageSetup.PaperSize = Microsoft.Office.Interop.Excel.XlPaperSize.xlPaperA4
+        wSheet.PageSetup.Orientation = Microsoft.Office.Interop.Excel.XlPageOrientation.xlLandscape
+        wSheet.ExportAsFixedFormat(Microsoft.Office.Interop.Excel.XlFixedFormatType.xlTypePDF, reportPathPdf, Quality:=Microsoft.Office.Interop.Excel.XlFixedFormatQuality.xlQualityStandard, _
+                    IncludeDocProperties:=True, IgnorePrintAreas:=False, _
+                    OpenAfterPublish:=False)
+        wBook.Close()
+        excel.DisplayAlerts = True
+        excel.Quit()
+
+        Marshal.ReleaseComObject(wSheet)
+        Marshal.ReleaseComObject(wBook)
+
+        Marshal.ReleaseComObject(excel)
+        wSheet = Nothing
+        wBook = Nothing
+        excel = Nothing
+        MySharedMethod.KillAllExcels()
+        ComboStatus.Report(State.FinishedReport)
+
+        If (startDate = endDate) Then
+
+            ComboStatus.Report(State.Finished)
+            ShowCompletionDialog()
+
+        End If
+
+
+    End Sub
+
+
+
     Private Sub DisableForm()
 
         For Each ctrl As Control In Controls
@@ -2516,6 +2748,7 @@ Public Class Form1
         For Each ctrl As Control In Controls
             If Not ctrl.Equals(dgv) And ctrl.Enabled = False Then
                 ctrl.Enabled = True
+                ProgressBar1.Visible = False
             End If
         Next
 
@@ -2558,4 +2791,26 @@ Public Class Form1
         Return callerName
     End Function
 
+    Private Sub preRenderTable(section As Integer)
+
+        For Each column As DataGridViewColumn In dgv.Columns
+            If hiddenColumns.Contains(column.DataPropertyName) Then
+                column.Visible = False
+            End If
+        Next
+
+        If hiddenColumns.Count.Equals(0) Then
+            For Each column As DataGridViewColumn In dgv.Columns
+                If section = 8 Then
+                    If column.DataPropertyName = "E9Q_NH3" Or column.DataPropertyName = "NH3_SOMMA" Or column.DataPropertyName = "NOX57_SOMMA" Then
+                        column.Visible = True
+                    End If
+                Else
+                    column.Visible = True
+                End If
+
+            Next
+        End If
+
+    End Sub
 End Class

@@ -386,8 +386,9 @@ InteropTests/NativeTests/out
 **/ScratchProject/
 **/ScratchProjectWithInternals/
 
-# Ignore report file
+# Ignore report and template file
 /portaleARPA/report/
+/portaleARPA/template
 
 # Ignore log file
 /portaleARPA/logger
