@@ -855,7 +855,7 @@ Public Class Form1
         testCMD.CommandType = Data.CommandType.StoredProcedure
         testCMD.Parameters.Add("@idsez", Data.SqlDbType.Int, 11)
         testCMD.Parameters("@idsez").Direction = Data.ParameterDirection.Input
-        testCMD.Parameters("@idsez").Value = Convert.ToInt32(section) 'Request.QueryString("Sezione").ToString())
+        testCMD.Parameters("@idsez").Value = section 'Request.QueryString("Sezione").ToString())
 
         testCMD.Parameters.Add("@data", Data.SqlDbType.DateTime, 11)
         testCMD.Parameters("@data").Direction = Data.ParameterDirection.Input
@@ -1633,12 +1633,12 @@ Public Class Form1
                 Else
                     If i = 2 Then
                         ' Se è la terza riga, formato ORA
-                        'Dim cellDateTime As DateTime
-                        'If DateTime.TryParse(cellValue, cellDateTime) Then
-                        wSheet.Cells(rowIndex, kk) = String.Format("{0:HH.mm}", currentRow.Cells(kk).Value)
-                        'Else
-                        'wSheet.Cells(rowIndex, kk) = cellValue
-                        'End If
+                        Dim cellDateTime As DateTime
+                        If DateTime.TryParse(cellValue, cellDateTime) Then
+                            wSheet.Cells(rowIndex, kk) = cellDateTime.ToString("HH.mm")
+                        Else
+                            wSheet.Cells(rowIndex, kk) = cellValue
+                        End If
                     Else
                         If startDate < d2 AndAlso kk >= 38 Then
                             wSheet.Cells(rowIndex, kk) = currentRow.Cells(kk + 1).Value.ToString()
@@ -1853,12 +1853,13 @@ Public Class Form1
                             wSheet.Cells(ep + 37, kk).PasteSpecial()
                         Else
                             ' Mostra il numero con due cifre decimali
-                            Dim doubleVal As Double
-                            If (Double.TryParse(currentRow.Cells(kk).Value.ToString(), doubleVal)) Then
-                                wSheet.Cells(ep + 36, kk).Value = String.Format("{0:0.00}", (doubleVal) / 1000)
+                            Dim doubleValue As Double
+                            If (Double.TryParse(currentRow.Cells(kk).Value, doubleValue)) Then
+                                wSheet.Cells(ep + 36, kk).Value = String.Format("{0:0.00}", (doubleValue / 1000))
                             Else
-                                wSheet.Cells(ep + 36, kk).Value = currentRow.Cells(kk).Value
+                                wSheet.Cells(ep + 36, kk).Value = ""
                             End If
+
                             ' Colore grigio per la riga somma annuale
                             If ep = dgv.Rows.Count - 1 Then
                                 wSheet.Cells(ep + 36, 12).Interior.Color = Color.LightGray
@@ -1895,74 +1896,73 @@ Public Class Form1
 
             app = "C" & i + cellOffset & ":G" & i + cellOffset
             wSheet.Range(app).BorderAround()
-            Try
-                If (Not (dontMerge)) Then
-                    wSheet.Range(app).Merge()
-                End If
-                wSheet.Range(app).HorizontalAlignment = -4108
-                wSheet.Range(app).VerticalAlignment = -4108
-                app = "H" & i + cellOffset & ":L" & i + cellOffset
-                wSheet.Range(app).BorderAround()
-                If (Not (dontMerge)) Then
-                    wSheet.Range(app).Merge()
-                End If
-                wSheet.Range(app).HorizontalAlignment = -4108
-                wSheet.Range(app).VerticalAlignment = -4108
-                app = "M" & i + cellOffset & ":Q" & i + cellOffset
-                wSheet.Range(app).BorderAround()
-                If (Not (dontMerge)) Then
-                    wSheet.Range(app).Merge()
-                End If
-                wSheet.Range(app).HorizontalAlignment = -4108
-                wSheet.Range(app).VerticalAlignment = -4108
-                app = "R" & i + cellOffset & ":V" & i + cellOffset
-                wSheet.Range(app).BorderAround()
-                If (Not (dontMerge)) Then
-                    wSheet.Range(app).Merge()
-                End If
-                wSheet.Range(app).HorizontalAlignment = -4108
-                wSheet.Range(app).VerticalAlignment = -4108
-                app = "W" & i + cellOffset & ":AA" & i + cellOffset
-                wSheet.Range(app).BorderAround()
-                If (Not (dontMerge)) Then
-                    wSheet.Range(app).Merge()
-                End If
-                wSheet.Range(app).HorizontalAlignment = -4108
-                wSheet.Range(app).VerticalAlignment = -4108
-                app = "AB" & i + cellOffset & ":AF" & i + cellOffset
-                wSheet.Range(app).BorderAround()
-                If (Not (dontMerge)) Then
-                    wSheet.Range(app).Merge()
-                End If
-                wSheet.Range(app).HorizontalAlignment = -4108
-                wSheet.Range(app).VerticalAlignment = -4108
-                If (startDate >= d2) Then
-                    app = "AG" & i + cellOffset & ":AL" & i + cellOffset
-                Else
-                    app = "AG" & i + cellOffset & ":AK" & i + cellOffset
-                End If
+            If (Not (dontMerge)) Then
+                wSheet.Range(app).Merge()
+            End If
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "H" & i + cellOffset & ":L" & i + cellOffset
+            wSheet.Range(app).BorderAround()
+            If (Not (dontMerge)) Then
+                wSheet.Range(app).Merge()
+            End If
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "M" & i + cellOffset & ":Q" & i + cellOffset
+            wSheet.Range(app).BorderAround()
+            If (Not (dontMerge)) Then
+                wSheet.Range(app).Merge()
+            End If
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "R" & i + cellOffset & ":V" & i + cellOffset
+            wSheet.Range(app).BorderAround()
+            If (Not (dontMerge)) Then
+                wSheet.Range(app).Merge()
+            End If
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "W" & i + cellOffset & ":AA" & i + cellOffset
+            wSheet.Range(app).BorderAround()
+            If (Not (dontMerge)) Then
+                wSheet.Range(app).Merge()
+            End If
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            app = "AB" & i + cellOffset & ":AF" & i + cellOffset
+            wSheet.Range(app).BorderAround()
+            If (Not (dontMerge)) Then
+                wSheet.Range(app).Merge()
+            End If
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            If (startDate >= d2) Then
+                app = "AG" & i + cellOffset & ":AL" & i + cellOffset
+            Else
+                app = "AG" & i + cellOffset & ":AK" & i + cellOffset
+            End If
 
-                wSheet.Range(app).BorderAround()
-                If (Not (dontMerge)) Then
-                    wSheet.Range(app).Merge()
-                End If
-                wSheet.Range(app).HorizontalAlignment = -4108
-                wSheet.Range(app).VerticalAlignment = -4108
-                If (startDate >= d2) Then
-                    app = "AM" & i + cellOffset & ":AQ" & i + cellOffset
-                Else
-                    app = "AL" & i + cellOffset & ":AP" & i + cellOffset
-                End If
-                wSheet.Range(app).BorderAround()
-                If (Not (dontMerge)) Then
-                    wSheet.Range(app).Merge()
-                End If
-                wSheet.Range(app).HorizontalAlignment = -4108
-                wSheet.Range(app).VerticalAlignment = -4108
+            wSheet.Range(app).BorderAround()
+            If (Not (dontMerge)) Then
+                wSheet.Range(app).Merge()
+            End If
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
+            If (startDate >= d2) Then
+                app = "AM" & i + cellOffset & ":AQ" & i + cellOffset
+            Else
+                app = "AL" & i + cellOffset & ":AP" & i + cellOffset
+            End If
+            wSheet.Range(app).BorderAround()
+            If (Not (dontMerge)) Then
+                wSheet.Range(app).Merge()
+            End If
+            wSheet.Range(app).HorizontalAlignment = -4108
+            wSheet.Range(app).VerticalAlignment = -4108
 
-            Catch ex As Exception
-                Logger.LogWarning(" Error while merging cells", ex)
-            End Try
+
+            'tabella secondaria 43
+            'riga)
 
             For kk = 2 To 43
 
