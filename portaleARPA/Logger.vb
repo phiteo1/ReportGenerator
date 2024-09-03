@@ -1,17 +1,34 @@
 ﻿Imports System.IO
 
 Public Class Logger
-    Private Shared exePath As String = Application.StartupPath
-    Private Shared rootPath As String = Directory.GetParent(Directory.GetParent(exePath).FullName).FullName
+    Shared exePath As String = Application.StartupPath
+    ' Ottiene la directory tre livelli sopra l'eseguibile
+    Shared grandParentPath As String = Directory.GetParent(Directory.GetParent(exePath).FullName).FullName
     Private Shared logFile As String
     Private Shared logFilePath As String
+
+
+    Public Shared Sub CreateLogDir()
+
+        Dim logDir = Path.Combine(grandParentPath, "logger")
+        If Not Directory.Exists(logDir) Then
+            Try
+                Directory.CreateDirectory(logDir)
+            Catch ex As Exception
+                Console.WriteLine("Errore nella scrittura del log: " & ex.Message)
+            End Try
+
+        End If
+
+    End Sub
+
 
     ' Metodo per scrivere un messaggio di log
     Public Shared Sub Log(message As String)
 
         Dim timestamp As String = DateTime.Now.ToString("yyyyMMdd_HH")
         logFile = "log_£" & timestamp & ".txt"
-        logFilePath = Path.Combine(rootPath, "logger", logFile)
+        logFilePath = Path.Combine(grandParentPath, "logger", logFile)
         Try
             Using writer As StreamWriter = New StreamWriter(logFilePath, True)
                 writer.WriteLine(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") & " - " & message)
@@ -26,7 +43,7 @@ Public Class Logger
         Try
             Dim timestamp As String = DateTime.Now.ToString("yyyyMMdd_HH")
             logFile = "log_" & timestamp & ".txt"
-            logFilePath = Path.Combine(rootPath, "logger", logFile)
+            logFilePath = Path.Combine(grandParentPath, "logger", logFile)
             Using writer As StreamWriter = New StreamWriter(logFilePath, True)
                 writer.WriteLine(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") & " - ERRORE: " & message)
                 writer.WriteLine("Eccezione: " & ex.Message)
@@ -41,7 +58,7 @@ Public Class Logger
         Try
             Dim timestamp As String = DateTime.Now.ToString("yyyyMMdd_HH")
             logFile = "log_" & timestamp & ".txt"
-            logFilePath = Path.Combine(rootPath, "logger", logFile)
+            logFilePath = Path.Combine(grandParentPath, "logger", logFile)
             Using writer As StreamWriter = New StreamWriter(logFilePath, True)
                 writer.WriteLine(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") & " - WARNING: " & message)
                 writer.WriteLine("Eccezione: " & ex.Message)

@@ -56,7 +56,7 @@ Partial Class Form1
         Me.ComboBox1.Cursor = System.Windows.Forms.Cursors.Arrow
         Me.ComboBox1.Font = New System.Drawing.Font("Segoe UI", 8.25!, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
         Me.ComboBox1.FormattingEnabled = True
-        Me.ComboBox1.Items.AddRange(New Object() {"Camino E1", "Camino E2", "Camino E3", "Camino E4", "Camino E7", "Camino E8", "Camino E9", "Camino E10", "Flussi di massa", "Bolla di raffineria", "Stabilimento GPL"})
+        Me.ComboBox1.Items.AddRange(New Object() {"Camino E1", "Camino E2", "Camino E3", "Camino E4", "Camino E7", "Camino E8", "Camino E9", "Camino E10", "Flussi di massa", "Bolla di raffineria"})
         Me.ComboBox1.Location = New System.Drawing.Point(90, 200)
         Me.ComboBox1.Name = "ComboBox1"
         Me.ComboBox1.Size = New System.Drawing.Size(222, 21)
