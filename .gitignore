@@ -388,7 +388,7 @@ InteropTests/NativeTests/out
 
 # Ignore report and template file
 /portaleARPA/report/
-/portaleARPA/template
+/portaleARPA/template/
 
 # Ignore log file
 /portaleARPA/logger
