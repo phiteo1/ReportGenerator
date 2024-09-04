@@ -16,6 +16,7 @@ Public Class Form1
     Dim culture As System.Globalization.CultureInfo
     Dim reportType As Int32 = 255
     Dim section As Int32 = 255
+    Dim isCte As Byte = 0
     Dim ret As Int32
     Dim ret2 As Int32
     Dim dgv As DataGridView
@@ -26,6 +27,9 @@ Public Class Form1
     Dim d2 As Date
     Dim bolla As Byte
     Dim aia As Int32 = 1
+    Dim cteConfiguration As String = ""
+    Dim cteInvertedConfiguration As String = ""
+    Dim O2RefDict As New Dictionary(Of String, Integer)
     Dim hnf, htran As String
 
     Enum State                  'State Machine of the downloading process
@@ -42,8 +46,12 @@ Public Class Form1
 
         Logger.CreateLogDir()
         bolla = 254
+
         connectionString = ConfigurationManager.ConnectionStrings("AQMSDBCONN").ConnectionString
         connectionStringCTE = ConfigurationManager.ConnectionStrings("AQMSDBCONNCTE").ConnectionString
+        ComboBox3.Visible = False
+        Label6.Visible = False
+        ComboBox3.SelectedIndex = 0
         ComboBox1.SelectedIndex = 0
         ComboBox2.SelectedIndex = 0
         ProgressBar1.Maximum = 100
@@ -163,6 +171,16 @@ Public Class Form1
             aia = 0
         End If
 
+        If ComboBox3.Visible Then
+            isCte = 1
+            O2RefDict.Add("cogenerativo", 15)
+            O2RefDict.Add("caldaie", 3)
+            Dim invertedIndex As Byte
+            invertedIndex = If(ComboBox3.SelectedIndex = 0, 1, 0)
+            cteConfiguration = LCase(ComboBox3.SelectedItem)
+            cteInvertedConfiguration = LCase(ComboBox3.Items(invertedIndex).ToString())            
+        End If
+
         While (startDate <= endDate)
             UpdateProgressBarValue(0)
             If (Not ProgressBar1.Visible) Then
@@ -173,9 +191,12 @@ Public Class Form1
                     dataTable1 = GetDataFlussi(barProgress, startDate, endDate, section, reportType, 1)                                                                            'Get the data from the database and assign to first data table structure. The function is runned in an other trhead in order to allow the GUI to refresh properly
                     dataTable2 = GetDataFlussi(barProgress, startDate, endDate, section, reportType, 2)                                                                           'Get the data from the database and assign to second data table structure
                     preRenderFirstTable(section)
-                Else
+                ElseIf bolla = 1 Then
                     dataTable1 = GetFirstBollaTable(barProgress, startDate, endDate, section, reportType)                                                                          'Get the data from the database and assign to first data table structure. The function is runned in an other trhead in order to allow the GUI to refresh properly
                     dataTable2 = GetSecondBollaTable(barProgress, startDate, endDate, section, reportType)                                                                        'Get the data from the database and assign to second data table structure
+                Else
+                    'TODO
+
                 End If
 
             Else
@@ -238,7 +259,7 @@ Public Class Form1
             Case "Camino E2"
                 Return 2
             Case "Camino E3"
-                Return 8
+                Return 1
             Case "Camino E4"
                 Return 3
             Case "Camino E7"
@@ -1432,6 +1453,101 @@ Public Class Form1
         Return dt
 
     End Function
+
+    Private Function getFirstCTETable(progress As Progress(Of Integer), startTime As DateTime, endTime As DateTime, section As Int32, ByVal type As Int32) As Data.DataTable
+
+        Dim dt As New Data.DataTable()
+        Dim commandCTE As System.Data.SqlClient.SqlCommand
+        Dim connectionCTE As New SqlConnection(connectionStringCTE)
+        Dim queryNumber As Integer = 0
+        Dim queriesCount As Integer = 4
+        Dim progressStep As Integer = 100 \ queriesCount
+        Dim methodName As String = GetCurrentMethod()
+
+        If reportType = 0 Then                                                      ' It was needed thanks to the genius who wrote the logics in the portal :))
+            type = 3
+        ElseIf reportType = 1 Then
+            type = 2
+        End If
+
+        dt.Columns.Add(New Data.DataColumn("INTESTAZIONE", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("CO", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("NOX", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("SO2", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("POLVERI", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("COT", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("O2", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("QFUMI", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("TFUMI", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("PFUMI", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("H2O", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("O2RIF", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("MWE", GetType(String)))
+
+        Dim reader As System.Data.SqlClient.SqlDataReader
+        Dim testCMD As Data.SqlClient.SqlCommand = New Data.SqlClient.SqlCommand("sp_AQMSNT_FILL_ARPA_REPORT_WEB2017", connectionCTE)
+        testCMD.CommandType = Data.CommandType.StoredProcedure
+        testCMD.Parameters.Add("@idsez", Data.SqlDbType.Int, 11)
+        testCMD.Parameters("@idsez").Direction = Data.ParameterDirection.Input
+        testCMD.Parameters("@idsez").Value = section
+
+        testCMD.Parameters.Add("@data", Data.SqlDbType.DateTime, 11)
+        testCMD.Parameters("@data").Direction = Data.ParameterDirection.Input
+        testCMD.Parameters("@data").Value = startTime
+
+        If startTime >= "01/01/2018" Then
+            testCMD.Parameters.Add("@aia", Data.SqlDbType.Int, 11)
+            testCMD.Parameters("@aia").Direction = Data.ParameterDirection.Input
+            testCMD.Parameters("@aia").Value = aia
+        End If
+
+        testCMD.Parameters.Add("@tipoestrazione", Data.SqlDbType.Int, 11)
+        testCMD.Parameters("@tipoestrazione").Direction = Data.ParameterDirection.Input
+        testCMD.Parameters("@tipoestrazione").Value = type
+
+        testCMD.Parameters.Add("@o2_rif", Data.SqlDbType.Float, 11)
+        testCMD.Parameters("@o2_rif").Direction = Data.ParameterDirection.Input
+        testCMD.Parameters("@o2_rif").Value = O2RefDict(cteConfiguration)
+
+        testCMD.Parameters.Add("@retval", Data.SqlDbType.BigInt, 8)
+        testCMD.Parameters("@retval").Direction = Data.ParameterDirection.Output
+        testCMD.Parameters.Add("@HNF", Data.SqlDbType.Int)
+        testCMD.Parameters("@HNF").Direction = Data.ParameterDirection.Output
+        testCMD.Parameters.Add("@H_TRANS", Data.SqlDbType.Int)
+        testCMD.Parameters("@H_TRANS").Direction = Data.ParameterDirection.Output
+        testCMD.ExecuteScalar()
+
+        ret = testCMD.Parameters("@retval").Value
+        hnf = testCMD.Parameters("@HNF").Value.ToString()
+        htran = testCMD.Parameters("@H_TRANS").Value.ToString()
+
+        Dim log_statement As String = "SELECT * FROM [ARPA_REPORT_WEB] WHERE IDX_REPORT = " & ret.ToString() & " ORDER BY N_RIGA"
+        commandCTE = New System.Data.SqlClient.SqlCommand(log_statement, connectionCTE)
+        reader = commandCTE.ExecuteReader()
+        Dim dr As Data.DataRow = dt.NewRow()
+        While reader.Read()
+            dr("INTESTAZIONE") = reader("INTESTAZIONE")
+            dr("CO") = String.Format("{0:n2}", reader("CO"))
+            dr("NOX") = String.Format("{0:n2}", reader("NOX"))
+            dr("SO2") = String.Format("{0:n2}", reader("SO2"))
+            dr("POLVERI") = String.Format("{0:n2}", reader("POLVERI"))
+            dr("COT") = String.Format("{0:n2}", reader("COT"))
+
+            dr("QFUMI") = String.Format("{0:n2}", reader("QFUMI"))
+            dr("O2") = String.Format("{0:n2}", reader("O2"))
+            dr("TFUMI") = String.Format("{0:n2}", reader("TFUMI"))
+            dr("PFUMI") = String.Format("{0:n2}", reader("PFUMI"))
+            dr("H2O") = String.Format("{0:n2}", reader("H2O"))
+            dr("O2RIF") = String.Format("{0:n2}", reader("O2RIF"))
+            dr("MWE") = String.Format("{0:n2}", reader("MWE"))
+            dt.Rows.Add(dr)
+            dr = dt.NewRow()
+        End While
+        'IDReport.Value = ret
+        Return dt
+
+    End Function
+
 
 
 
@@ -3106,5 +3222,22 @@ Public Class Form1
     Private Sub reportCompleted(sender As Object, e As RunWorkerCompletedEventArgs)
         ShowForm()
     End Sub
+
+    Private Sub ComboBox1_SelectedIndexChanged(sender As Object, e As EventArgs) Handles ComboBox1.SelectedIndexChanged
+
+        Select Case ComboBox1.SelectedItem
+            Case "Camino E3"
+                ComboBox3.SelectedIndex = 0
+                Label6.Visible = True
+                ComboBox3.Visible = True
+            Case Else
+                If ComboBox3.Visible Then
+                    Label6.Visible = False
+                    ComboBox3.Visible = False
+                End If
+        End Select
+
+    End Sub
+
 End Class
 
