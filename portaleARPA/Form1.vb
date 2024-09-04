@@ -131,7 +131,7 @@ Public Class Form1
                                                                    actualState = State.DataLoading
                                                                Case 2
                                                                    UpdateTextBoxText("Table creation...")
-                                                                   UpdateProgressBarStatus(True)
+                                                                   UpdateProgressBarStatus(False)
                                                                    actualState = State.TableLoading
                                                                Case 3
                                                                    UpdateTextBoxText("Sheet creation...")
@@ -166,7 +166,7 @@ Public Class Form1
         While (startDate <= endDate)
             UpdateProgressBarValue(0)
             If (Not ProgressBar1.Visible) Then
-                ProgressBar1.Visible = True
+                UpdateProgressBarStatus(True)
             End If
             If section = 8 Then
                 If bolla = 0 Then
