@@ -4,7 +4,9 @@ Imports System.Globalization
 Imports System.IO
 Imports System.Data.SqlClient
 Imports System.Runtime.InteropServices
+Imports System.Diagnostics
 Imports System.Reflection
+Imports System.ComponentModel
 
 
 Public Class Form1
@@ -44,6 +46,7 @@ Public Class Form1
         connectionStringCTE = ConfigurationManager.ConnectionStrings("AQMSDBCONNCTE").ConnectionString
         ComboBox1.SelectedIndex = 0
         ComboBox2.SelectedIndex = 0
+        ProgressBar1.Maximum = 100
         TextBox1.Visible = False
         DateTimePicker1.Value = Date.Now.AddYears(-1)
         culture = System.Globalization.CultureInfo.CreateSpecificCulture("en-US")
@@ -58,14 +61,30 @@ Public Class Form1
 
     End Sub
 
-    Private Async Sub Button1_Click(sender As Object, e As EventArgs) Handles Button1.Click
+    Private Sub Button1_Click(sender As Object, e As EventArgs) Handles Button1.Click
 
+        Dim worker As New BackgroundWorker()
+        worker.WorkerReportsProgress = False
+        worker.WorkerSupportsCancellation = False
+
+        ' Aggiungi gestori per gli eventi
+        AddHandler worker.DoWork, AddressOf mainThread
+        AddHandler worker.RunWorkerCompleted, AddressOf reportCompleted
         DisableForm()
         TextBox1.Visible = True
         reportType = ComboBox2.SelectedIndex
         section = GetSection(ComboBox1.SelectedItem)
-        Dim exePath As String = Application.StartupPath
-        ' Ottiene la directory tre livelli sopra l'eseguibile
+        'Dim thread As New Threading.Thread(AddressOf mainThread)
+        'thread.IsBackground = True
+        'thread.Start()
+        worker.RunWorkerAsync()
+        'ShowForm()
+
+    End Sub
+
+    Private Sub mainThread()
+
+        Dim exePath As String = Application.StartupPath                                                                                                                     ' Ottiene la directory due livelli sopra l'eseguibile
         Dim grandParentPath As String = Directory.GetParent(Directory.GetParent(exePath).FullName).FullName
         Dim chimneyName As String = MySharedMethod.GetChimneyName(Convert.ToInt16(section.ToString()))
         Dim reportPath As String = Path.Combine(grandParentPath, "report", chimneyName)
@@ -91,107 +110,110 @@ Public Class Form1
             Return
         End If
 
-        ProgressBar1.Visible = True
-        ProgressBar1.Maximum = 100
-        TextBox1.Visible = True
+        UpdateProgressBarStatus(True)
+
+        UpdateTextBoxStatus(True)
 
 
         Dim barProgress As New Progress(Of Integer)(Sub(v)
-                                                        ProgressBar1.Value = v
+                                                        UpdateProgressBarValue(v)
                                                     End Sub)                                                    'Refresh the GUI when a change in the progress bar occours
 
 
         Dim StatusProgress As New Progress(Of Integer)(Sub(index)
                                                            Select Case index
                                                                Case 1
-                                                                   TextBox1.Text = "Data Loading..."
+                                                                   UpdateTextBoxText("Data Loading...")
                                                                    actualState = State.DataLoading
                                                                Case 2
-                                                                   TextBox1.Text = "Table Creation..."
-                                                                   ProgressBar1.Visible = False
+                                                                   UpdateTextBoxText("Table creation...")
+                                                                   UpdateProgressBarStatus(True)
                                                                    actualState = State.TableLoading
                                                                Case 3
-                                                                   TextBox1.Text = "Sheet Creation..."
+                                                                   UpdateTextBoxText("Sheet creation...")
                                                                    actualState = State.SheetLoading
                                                                Case 4
                                                                    If (reportType = 0) Then
-                                                                       TextBox1.Text = "Year " & startDate.Year.ToString & " downloaded succesfully"
+
+                                                                       UpdateTextBoxText("Year " & startDate.Year.ToString & " downloaded succesfully")
+
                                                                    ElseIf (reportType = 1) Then
-                                                                       TextBox1.Text = "Month " & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MMMM yyyy}", Date.Parse(startDate)) & " downloaded succesfully"
+
+                                                                       UpdateTextBoxText("Month " & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MMMM yyyy}", Date.Parse(startDate)) & " downloaded succesfully")
+
                                                                    End If
                                                                    actualState = State.FinishedReport
                                                                Case 5
-                                                                   TextBox1.Text = "Report generation finished!"
+                                                                   UpdateTextBoxText("Report generation finished!")
                                                                    actualState = State.Finished
                                                                    Button1.Text = "Generate Report"
-                                                                   EnableForm()
-                                                                   Me.Hide()
+                                                                   EnableFormSafe(Me)
+                                                                   HideFormSafe(Me)
                                                            End Select
                                                        End Sub)                                             'Refresh the GUI when a change in the state occours
-        Controls.Add(dgv)
-        Controls.Add(dgv2)
+        AddDataTableToControl(Me, dgv)
+        AddDataTableToControl(Me, dgv2)
 
         Dim dataTable1 As DataTable
         Dim dataTable2 As DataTable
-
 
         If Not CheckBox1.Checked Then
             aia = 0
         End If
 
         While (startDate <= endDate)
-            ProgressBar1.Value = 0
+            UpdateProgressBarValue(0)
             If (Not ProgressBar1.Visible) Then
                 ProgressBar1.Visible = True
             End If
             If section = 8 Then
                 If bolla = 0 Then
-                    dataTable1 = Await Task.Run(Function() GetDataFlussi(barProgress, startDate, endDate, section, reportType, 1, dgv))   'Get the data from the database and assign to first data table structure. The function is runned in an other trhead in order to allow the GUI to refresh properly
-                    dataTable2 = Await Task.Run(Function() GetDataFlussi(barProgress, startDate, endDate, section, reportType, 2, dgv2))  'Get the data from the database and assign to second data table structure
-                    preRenderTable(section)
+                    dataTable1 = GetDataFlussi(barProgress, startDate, endDate, section, reportType, 1, dgv)                'Get the data from the database and assign to first data table structure. The function is runned in an other trhead in order to allow the GUI to refresh properly
+                    dataTable2 = GetDataFlussi(barProgress, startDate, endDate, section, reportType, 2, dgv2)               'Get the data from the database and assign to second data table structure
+                    preRenderFirstTable(section)
                 Else
-                    dataTable1 = Await Task.Run(Function() GetFirstBollaTable(barProgress, startDate, endDate, section, reportType, dgv))   'Get the data from the database and assign to first data table structure. The function is runned in an other trhead in order to allow the GUI to refresh properly
-                    dataTable2 = Await Task.Run(Function() GetSecondBollaTable(barProgress, startDate, endDate, section, reportType, dgv2))  'Get the data from the database and assign to second data table structure
+                    dataTable1 = GetFirstBollaTable(barProgress, startDate, endDate, section, reportType, dgv)              'Get the data from the database and assign to first data table structure. The function is runned in an other trhead in order to allow the GUI to refresh properly
+                    dataTable2 = GetSecondBollaTable(barProgress, startDate, endDate, section, reportType, dgv2)            'Get the data from the database and assign to second data table structure
                 End If
 
             Else
-                dataTable1 = Await Task.Run(Function() GetFirstCaminiTable(barProgress, startDate, endDate, section, reportType, dgv))
-                dataTable2 = Await Task.Run(Function() GetSecondCaminiTable(barProgress, startDate, endDate, section, reportType, dgv2))
-                preRenderTable(section)
+                dataTable1 = GetFirstCaminiTable(barProgress, startDate, endDate, section, reportType, dgv)
+                dataTable2 = GetSecondCaminiTable(barProgress, startDate, endDate, section, reportType, dgv2)
+                preRenderFirstTable(section)
             End If
 
             If dataTable1 Is Nothing Then
                 MessageBox.Show("Errore nell'acquisizione dei dati, consultare il file di log per i dettagli.", "Avviso", MessageBoxButtons.OK, MessageBoxIcon.Warning)
-                EnableForm()
+                EnableFormSafe(Me)
                 Return
             Else
-                dgv.DataSource = dataTable1                                                                                     'Bind the data to the first DataGridView
+                UpdateDgvDataSource(dataTable1, dgv)                                                                                     'Bind the data to the first DataGridView
             End If
 
             If dataTable2 Is Nothing Then
                 MessageBox.Show("Errore nell'acquisizione dei dati, consultare il file di log per i dettagli.", "Avviso", MessageBoxButtons.OK, MessageBoxIcon.Warning)
-                EnableForm()
+                EnableFormSafe(Me)
                 Return
             Else
-                dgv2.DataSource = dataTable2                                                                                    'Bind the data to the second DataGridView
+                UpdateDgvDataSource(dataTable2, dgv2)                                                                                  'Bind the data to the second DataGridView
             End If
 
-            dgv.Visible = True
-            dgv.Visible = False                                                                                             'Dont' worry about that. It's an hack to get the correct number of rows
-            dgv2.Visible = True
-            dgv2.Visible = False
+            UpdateDgvStatus(True, dgv)
+            UpdateDgvStatus(False, dgv)                                                                                             'Dont' worry about that. It's an hack to get the correct number of rows
+            UpdateDgvStatus(True, dgv2)
+            UpdateDgvStatus(False, dgv2)
 
 
             If bolla = 0 Then
-                Await Task.Run(Sub() downloadReportFlussi(StatusProgress, startDate, endDate, reportPath))                              'Download the reports of the selected years. The function is runned in an other trhead in order to allow the GUI to refresh properly 
+                downloadReportFlussi(StatusProgress, startDate, endDate, reportPath)                                         'Download the reports of the selected years. The function is runned in an other trhead in order to allow the GUI to refresh properly 
 
             ElseIf bolla = 1 Then
-                Await Task.Run(Sub() downloadReportBolla(StatusProgress, startDate, endDate, reportPath))
+                downloadReportBolla(StatusProgress, startDate, endDate, reportPath)
             Else
                 If reportType = 0 Then
-                    Await Task.Run(Sub() downloadYearlyReportCamini(StatusProgress, startDate, endDate, reportPath))
+                    downloadYearlyReportCamini(StatusProgress, startDate, endDate, reportPath)
                 ElseIf reportType = 1 Then
-                    Await Task.Run(Sub() downloadMonthlyReportCamini(StatusProgress, startDate, endDate, reportPath))
+                    downloadMonthlyReportCamini(StatusProgress, startDate, endDate, reportPath)
                 End If
             End If
 
@@ -204,11 +226,7 @@ Public Class Form1
             End If
             startDate = DateAdd(deltaTime, 1, startDate)
         End While
-
-        ShowForm()                                                                                                          'Reload the form to initial condition
-
     End Sub
-
     Private Function GetSection(camino As String) As Int32
 
         Select Case camino
@@ -244,7 +262,7 @@ Public Class Form1
 
     End Function
 
-    Private Function GetDataFlussi(progress As IProgress(Of Integer), startTime As DateTime, endTime As DateTime, section As Int32, type As Int32, whatTable As Byte, dgv As DataGridView) As Data.DataTable
+    Private Function GetDataFlussi(progress As Progress(Of Integer), startTime As DateTime, endTime As DateTime, section As Int32, type As Int32, whatTable As Byte, dgv As DataGridView) As Data.DataTable
 
         Dim dt As New Data.DataTable()
         Dim command As System.Data.SqlClient.SqlCommand
@@ -571,7 +589,7 @@ Public Class Form1
         Return dt
     End Function
 
-    Private Function GetFirstCaminiTable(progress As IProgress(Of Integer), startTime As DateTime, endTime As DateTime, section As Int32, ByVal type As Int32, dgv As DataGridView) As Data.DataTable
+    Private Function GetFirstCaminiTable(progress As Progress(Of Integer), startTime As DateTime, endTime As DateTime, section As Int32, ByVal type As Int32, dgv As DataGridView) As Data.DataTable
 
         Dim dt As New Data.DataTable()
         Dim command As System.Data.SqlClient.SqlCommand
@@ -785,7 +803,7 @@ Public Class Form1
     End Function
 
 
-    Private Function GetSecondCaminiTable(progress As IProgress(Of Integer), startTime As DateTime, endTime As DateTime, section As Int32, type As Int32, dgv As DataGridView) As Data.DataTable
+    Private Function GetSecondCaminiTable(progress As Progress(Of Integer), startTime As DateTime, endTime As DateTime, section As Int32, type As Int32, dgv As DataGridView) As Data.DataTable
 
         Dim dt As New Data.DataTable()
         Dim command As System.Data.SqlClient.SqlCommand
@@ -989,7 +1007,7 @@ Public Class Form1
 
 
 
-    Private Function GetFirstBollaTable(progress As IProgress(Of Integer), startTime As DateTime, endTime As DateTime, section As Int32, type As Int32, dgv As DataGridView) As Data.DataTable
+    Private Function GetFirstBollaTable(progress As Progress(Of Integer), startTime As DateTime, endTime As DateTime, section As Int32, type As Int32, dgv As DataGridView) As Data.DataTable
 
         Dim dt As New Data.DataTable()
         Dim command As System.Data.SqlClient.SqlCommand
@@ -1206,7 +1224,7 @@ Public Class Form1
 
     End Function
 
-    Private Function GetSecondBollaTable(progress As IProgress(Of Integer), startTime As DateTime, endTime As DateTime, section As Int32, type As Int32, dgv As DataGridView) As Data.DataTable
+    Private Function GetSecondBollaTable(progress As Progress(Of Integer), startTime As DateTime, endTime As DateTime, section As Int32, type As Int32, dgv As DataGridView) As Data.DataTable
 
         Dim dt As New Data.DataTable()
         Dim command As System.Data.SqlClient.SqlCommand
@@ -1521,7 +1539,7 @@ Public Class Form1
 
     End Sub
 
-    Private Sub downloadReportFlussi(ComboStatus As IProgress(Of Integer), startDate As Date, endDate As Date, reportDir As String)
+    Private Sub downloadReportFlussi(ComboStatus As Progress(Of Integer), startDate As Date, endDate As Date, reportDir As String)
 
 
         Dim excel As New Microsoft.Office.Interop.Excel.ApplicationClass
@@ -2060,7 +2078,7 @@ Public Class Form1
                                 wSheet.Cells(ep + 36, kk) = currentRow.Cells(kk).Value.ToString()
                             End If
 
-                                
+
 
                             'colore grigio riga somma annuale
 
@@ -2071,8 +2089,8 @@ Public Class Form1
                                 wSheet.Cells(ep + 37, kk).font.bold = True
                             End If
 
-                            End If
-                            'End If
+                        End If
+                        'End If
                     End If
                 Next
             Next
@@ -2226,7 +2244,7 @@ Public Class Form1
 
     End Sub
 
-    Private Sub downloadReportBolla(ComboStatus As IProgress(Of Integer), startDate As Date, endDate As Date, reportDir As String)
+    Private Sub downloadReportBolla(ComboStatus As Progress(Of Integer), startDate As Date, endDate As Date, reportDir As String)
 
         Dim excel As New Microsoft.Office.Interop.Excel.ApplicationClass
         Dim wBook As Microsoft.Office.Interop.Excel.Workbook
@@ -2498,7 +2516,7 @@ Public Class Form1
 
     End Sub
 
-    Private Sub downloadYearlyReportCamini(ComboStatus As IProgress(Of Integer), startDate As Date, endDate As Date, reportDir As String)
+    Private Sub downloadYearlyReportCamini(ComboStatus As Progress(Of Integer), startDate As Date, endDate As Date, reportDir As String)
 
         Dim excel As New Microsoft.Office.Interop.Excel.ApplicationClass
         Dim wBook As Microsoft.Office.Interop.Excel.Workbook
@@ -2716,7 +2734,7 @@ Public Class Form1
 
     End Sub
 
-    Private Sub downloadMonthlyReportCamini(ComboStatus As IProgress(Of Integer), startDate As Date, endDate As Date, reportDir As String)
+    Private Sub downloadMonthlyReportCamini(ComboStatus As Progress(Of Integer), startDate As Date, endDate As Date, reportDir As String)
 
         Dim excel As New Microsoft.Office.Interop.Excel.ApplicationClass
         Dim wBook As Microsoft.Office.Interop.Excel.Workbook
@@ -2965,6 +2983,7 @@ Public Class Form1
 
     Private Sub ResetForm()
 
+        ProgressBar1.Visible = False
         ComboBox1.SelectedIndex = 0
         ComboBox2.SelectedIndex = 0
         DateTimePicker2.Value = Date.Now
@@ -2988,15 +3007,17 @@ Public Class Form1
 
     End Sub
 
-    Private Function GetCurrentMethod(<Runtime.CompilerServices.CallerMemberName> Optional callerName As String = Nothing) As String
-        Return callerName
+    Private Function GetCurrentMethod() As String
+        Dim stackTrace As New StackTrace()
+        Dim method As MethodBase = stackTrace.GetFrame(1).GetMethod()
+        Return method.Name
     End Function
 
-    Private Sub preRenderTable(section As Integer)
+    Private Sub preRenderFirstTable(section As Integer)
 
         For Each column As DataGridViewColumn In dgv.Columns
             If hiddenColumns.Contains(column.DataPropertyName) Then
-                column.Visible = False
+                UpdateDgvColumnVisibility(False, dgv, column.Name)
             End If
         Next
 
@@ -3004,10 +3025,10 @@ Public Class Form1
             For Each column As DataGridViewColumn In dgv.Columns
                 If section = 8 Then
                     If column.DataPropertyName = "E9Q_NH3" Or column.DataPropertyName = "NH3_SOMMA" Or column.DataPropertyName = "NOX57_SOMMA" Then
-                        column.Visible = True
+                        UpdateDgvColumnVisibility(True, dgv, column.Name)
                     End If
                 Else
-                    column.Visible = True
+                    UpdateDgvColumnVisibility(True, dgv, column.Name)
                 End If
 
             Next
@@ -3015,5 +3036,103 @@ Public Class Form1
 
     End Sub
 
+    Private Sub UpdateProgressBarStatus(visibility As Boolean)
+        If ProgressBar1.InvokeRequired Then
+            Me.Invoke(New Action(Of Boolean)(AddressOf UpdateProgressBarStatus), visibility)
+        Else
+            ProgressBar1.Visible = visibility
+        End If
+    End Sub
+
+    Private Sub UpdateTextBoxStatus(visibility As Boolean)
+        If ProgressBar1.InvokeRequired Then
+            Me.Invoke(New Action(Of Boolean)(AddressOf UpdateTextBoxStatus), visibility)
+        Else
+            TextBox1.Visible = visibility
+        End If
+    End Sub
+
+    Private Sub UpdateProgressBarValue(value As Integer)
+        If ProgressBar1.InvokeRequired Then
+            Me.Invoke(New Action(Of Integer)(AddressOf UpdateProgressBarValue), value)
+        Else
+            ProgressBar1.Value = value
+        End If
+    End Sub
+
+    Private Sub UpdateTextBoxText(text As String)
+        If ProgressBar1.InvokeRequired Then
+            Me.Invoke(New Action(Of String)(AddressOf UpdateTextBoxText), text)
+        Else
+            TextBox1.Text = text
+        End If
+    End Sub
+
+    Private Sub UpdateDgvStatus(visibility As Boolean, dataTable As DataGridView)
+        If dataTable.InvokeRequired Then
+            Me.Invoke(New Action(Of Boolean, DataGridView)(AddressOf UpdateDgvStatus), visibility, dataTable)
+        Else
+            dataTable.Visible = visibility
+        End If
+    End Sub
+
+    Private Sub AddDataTableToControl(control As Control, dataTable As DataGridView)
+        ' Se siamo su un thread diverso, usa Invoke per eseguire l'aggiunta sul thread principale
+        If control.InvokeRequired Then
+            control.Invoke(New Action(Of Control, DataGridView)(AddressOf AddDataTableToControl), control, dataTable)
+        Else
+            control.Controls.Add(dgv)
+        End If
+    End Sub
+
+    Private Sub UpdateDgvDataSource(ds As DataTable, dataTable As DataGridView)
+        If dataTable.InvokeRequired Then
+            Me.Invoke(New Action(Of DataTable, DataGridView)(AddressOf UpdateDgvDataSource), ds, dataTable)
+        Else
+            dataTable.DataSource = ds
+        End If
+    End Sub
+
+    Public Sub UpdateDgvColumnVisibility(visibility As Boolean, dgv As DataGridView, col As String)
+        If dgv.InvokeRequired Then
+            dgv.Invoke(New Action(Of Boolean, DataGridView, String)(AddressOf UpdateDgvColumnVisibility), visibility, dgv, col)
+        Else
+            dgv.Columns(col).Visible = visibility
+        End If
+    End Sub
+
+    Public Sub EnableFormSafe(container As Control)
+        If container.InvokeRequired Then
+            container.Invoke(New Action(Of Control)(AddressOf EnableFormSafe), container)
+        Else
+            EnableControls(container)
+            ResetForm()
+        End If
+    End Sub
+
+    Private Sub EnableControls(container As Control)
+        For Each ctrl As Control In container.Controls
+            If Not ctrl.Equals(dgv) AndAlso Not ctrl.Equals(dgv2) AndAlso Not ctrl.Enabled Then
+                ctrl.Enabled = True
+            End If
+
+            ' Ricorsione: se il controllo corrente contiene altri controlli, chiama EnableControls su di essi
+            If ctrl.HasChildren Then
+                EnableControls(ctrl)
+            End If
+        Next
+    End Sub
+
+    Public Sub HideFormSafe(control As Control)
+        If control.InvokeRequired Then
+            control.Invoke(New Action(Of Control)(AddressOf HideFormSafe), control)
+        Else
+            control.Hide()
+        End If
+    End Sub
+
+    Private Sub reportCompleted(sender As Object, e As RunWorkerCompletedEventArgs)
+        ShowForm()
+    End Sub
 End Class
 

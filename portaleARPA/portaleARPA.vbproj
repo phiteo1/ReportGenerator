@@ -11,7 +11,7 @@
     <AssemblyName>portaleARPA</AssemblyName>
     <FileAlignment>512</FileAlignment>
     <MyType>WindowsForms</MyType>
-    <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <Deterministic>true</Deterministic>
     <TargetFrameworkProfile />
@@ -124,6 +124,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="App_Code\MySharedMethod.vb" />
+    <Compile Include="Class1.vb" />
     <Compile Include="Logger.vb" />
     <Compile Include="Form1.vb">
       <SubType>Form</SubType>
