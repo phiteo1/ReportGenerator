@@ -1144,7 +1144,7 @@ Public Class Form1
                     ElseIf (type = 1) Then
                         dr("ORA") = String.Format("{0:dd}", reader("ORA"))
                     Else
-                        dr("ORA") = String.Format("{0:MMMM}", reader("ORA"))
+                        dr("ORA") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:MMMM}", DateTime.Parse(reader("ORA").ToString()))
                     End If
 
                     ''Quando comincio a leggere i dati riassuntivi inserisco una riga vuota
