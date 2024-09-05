@@ -178,7 +178,7 @@ Public Class Form1
             Dim invertedIndex As Byte
             invertedIndex = If(ComboBox3.SelectedIndex = 0, 1, 0)
             cteConfiguration = LCase(ComboBox3.SelectedItem)
-            cteInvertedConfiguration = LCase(ComboBox3.Items(invertedIndex).ToString())            
+            cteInvertedConfiguration = LCase(ComboBox3.Items(invertedIndex).ToString())
         End If
 
         While (startDate <= endDate)
@@ -1754,37 +1754,6 @@ Public Class Form1
             wSheet.Range(app).NumberFormat = "@"
             wSheet.Range(app).BorderAround()
 
-
-
-            'riempe la tabella con i valori
-            'prima tabella
-            '  For j = 0 To gv_dailyrep.Columns.Count - 1
-            'If (CType(gv_dailyrep.Columns(j), BoundField).DataField.StartsWith("IS_BOLD")) Then
-            'Dim inquinante = CType(gv_dailyrep.Columns(j), BoundField).DataField.Split({"IS_BOLD_"}, StringSplitOptions.RemoveEmptyEntries)(0)
-            'currentExcelCol = wSheet.Range(inquinante + "_IC").Address.Split({"$"c}, StringSplitOptions.RemoveEmptyEntries)(0)
-            'app = currentExcelCol + Convert.ToString(i + 11) + ":" + currentExcelCol + Convert.ToString(i + 11)
-
-
-            '            End If
-
-            'SE NON C'E' IL NOME DI COLONNA SUL TEMPLATE CORRISPONDENTE AL NOME SUL DATAGRID SALTA LA SCRITTURA SU TEMPLATE
-            'Try
-            'col = wSheet.Range(CType(gv_dailyrep.Columns(j), BoundField).DataField).Column
-            'Catch ex As Exception
-            'Continue For
-            'End Try
-
-            'If gv_dailyrep.SelectedRow.Cells(j).Text.ToString() = "&nbsp;" Then
-            'wSheet.Cells(i + 11, col) = ""
-            'Else
-            'wSheet.Cells(i + 11, col) = gv_dailyrep.SelectedRow.Cells(j).Text.ToString()
-            'End If
-            'Next
-            'Next
-
-            'SE NON C'E' IL NOME DI COLONNA SUL TEMPLATE CORRISPONDENTE AL NOME SUL DATAGRID SALTA LA SCRITTURA SU TEMPLATE
-
-
             For kk = 2 To quit
                 If currentRow.Cells(kk).Value.ToString() = "&nbsp;" Then
                     wSheet.Cells(i + 11, kk) = ""
@@ -2189,9 +2158,9 @@ Public Class Form1
                             wSheet.Paste()
                         Else
                             'il nuemro viene mostrato solo con due cifre decimali
-                            Dim doubleVale As Double
-                            If (Double.TryParse(currentRow.Cells(kk).Value.ToString(), doubleVale)) Then
-                                wSheet.Cells(ep + 36, kk) = String.Format("{0:0.00}", (currentRow.Cells(kk).Value.ToString()) / 1000)
+                            Dim doubleValue As Double
+                            If (Double.TryParse(currentRow.Cells(kk).Value.ToString(), doubleValue)) Then
+                                wSheet.Cells(ep + 36, kk) = String.Format("{0:0.00}", (doubleValue) / 1000)
                             Else
                                 wSheet.Cells(ep + 36, kk) = currentRow.Cells(kk).Value.ToString()
                             End If
@@ -2331,10 +2300,9 @@ Public Class Form1
         Dim reportPath = Path.Combine(reportDir, reportFileXls)
         Dim reportPathPdf = Path.Combine(reportDir, reportFilePdf)
         excel.DisplayAlerts = False
-        wBook.SaveAs(reportPath, Microsoft.Office.Interop.Excel.XlFileFormat.xlWorkbookNormal, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, Microsoft.Office.Interop.Excel.XlSaveAsAccessMode.xlNoChange)
-        wSheet.PageSetup.PrintArea = "A1:Z60"
         wSheet.PageSetup.PaperSize = Microsoft.Office.Interop.Excel.XlPaperSize.xlPaperA4
         wSheet.PageSetup.Orientation = Microsoft.Office.Interop.Excel.XlPageOrientation.xlLandscape
+        wBook.SaveAs(reportPath, Microsoft.Office.Interop.Excel.XlFileFormat.xlWorkbookNormal, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, Microsoft.Office.Interop.Excel.XlSaveAsAccessMode.xlNoChange)
         wSheet.ExportAsFixedFormat(Microsoft.Office.Interop.Excel.XlFixedFormatType.xlTypePDF, reportPathPdf, Quality:=Microsoft.Office.Interop.Excel.XlFixedFormatQuality.xlQualityStandard, _
                     IncludeDocProperties:=True, IgnorePrintAreas:=False, _
                     OpenAfterPublish:=False)
@@ -2607,7 +2575,7 @@ Public Class Form1
         Dim reportPathPdf = Path.Combine(reportDir, reportFilePdf)
         excel.DisplayAlerts = False
         wBook.SaveAs(reportPath, Microsoft.Office.Interop.Excel.XlFileFormat.xlWorkbookNormal, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, Microsoft.Office.Interop.Excel.XlSaveAsAccessMode.xlNoChange)
-        wSheet.PageSetup.PrintArea = "A1:Z60"
+        wSheet.PageSetup.PrintArea = "A1:N" & insert_tab
         wSheet.PageSetup.PaperSize = Microsoft.Office.Interop.Excel.XlPaperSize.xlPaperA4
         wSheet.PageSetup.Orientation = Microsoft.Office.Interop.Excel.XlPageOrientation.xlLandscape
         wSheet.ExportAsFixedFormat(Microsoft.Office.Interop.Excel.XlFixedFormatType.xlTypePDF, reportPathPdf, Quality:=Microsoft.Office.Interop.Excel.XlFixedFormatQuality.xlQualityStandard, _
@@ -2822,10 +2790,11 @@ Public Class Form1
         Dim reportPath = Path.Combine(reportDir, reportFileXls)
         Dim reportPathPdf = Path.Combine(reportDir, reportFilePdf)
         excel.DisplayAlerts = False
-        wBook.SaveAs(reportPath, Microsoft.Office.Interop.Excel.XlFileFormat.xlWorkbookNormal, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, Microsoft.Office.Interop.Excel.XlSaveAsAccessMode.xlNoChange)
-        wSheet.PageSetup.PrintArea = "A1:Z60"
+        wSheet.PageSetup.LeftMargin = Double.Parse(ConfigurationManager.AppSettings("LeftMargin").ToString)
+        wSheet.PageSetup.RightMargin = Double.Parse(ConfigurationManager.AppSettings("RightMargin").ToString)
         wSheet.PageSetup.PaperSize = Microsoft.Office.Interop.Excel.XlPaperSize.xlPaperA4
         wSheet.PageSetup.Orientation = Microsoft.Office.Interop.Excel.XlPageOrientation.xlLandscape
+        wBook.SaveAs(reportPath, Microsoft.Office.Interop.Excel.XlFileFormat.xlWorkbookNormal, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, Microsoft.Office.Interop.Excel.XlSaveAsAccessMode.xlNoChange)
         wSheet.ExportAsFixedFormat(Microsoft.Office.Interop.Excel.XlFixedFormatType.xlTypePDF, reportPathPdf, Quality:=Microsoft.Office.Interop.Excel.XlFixedFormatQuality.xlQualityStandard, _
                     IncludeDocProperties:=True, IgnorePrintAreas:=False, _
                     OpenAfterPublish:=False)
@@ -3036,10 +3005,11 @@ Public Class Form1
         Dim reportPath = Path.Combine(reportDir, reportFileXls)
         Dim reportPathPdf = Path.Combine(reportDir, reportFilePdf)
         excel.DisplayAlerts = False
-        wBook.SaveAs(reportPath, Microsoft.Office.Interop.Excel.XlFileFormat.xlWorkbookNormal, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, Microsoft.Office.Interop.Excel.XlSaveAsAccessMode.xlNoChange)
-        wSheet.PageSetup.PrintArea = "A1:Z60"
+        wSheet.PageSetup.LeftMargin = Double.Parse(ConfigurationManager.AppSettings("LeftMargin").ToString)
+        wSheet.PageSetup.RightMargin = Double.Parse(ConfigurationManager.AppSettings("RightMargin").ToString)
         wSheet.PageSetup.PaperSize = Microsoft.Office.Interop.Excel.XlPaperSize.xlPaperA4
         wSheet.PageSetup.Orientation = Microsoft.Office.Interop.Excel.XlPageOrientation.xlLandscape
+        wBook.SaveAs(reportPath, Microsoft.Office.Interop.Excel.XlFileFormat.xlWorkbookNormal, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, Microsoft.Office.Interop.Excel.XlSaveAsAccessMode.xlNoChange)
         wSheet.ExportAsFixedFormat(Microsoft.Office.Interop.Excel.XlFixedFormatType.xlTypePDF, reportPathPdf, Quality:=Microsoft.Office.Interop.Excel.XlFixedFormatQuality.xlQualityStandard, _
                     IncludeDocProperties:=True, IgnorePrintAreas:=False, _
                     OpenAfterPublish:=False)
