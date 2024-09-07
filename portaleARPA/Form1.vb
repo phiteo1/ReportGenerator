@@ -15,8 +15,7 @@ Public Class Form1
     Dim connectionStringCTE As String
     Dim culture As System.Globalization.CultureInfo
     Dim reportType As Int32 = 255
-    Dim section As Int32 = 255
-    Dim isCte As Byte = 0
+    Dim section As Int32 = 255S
     Dim ret As Int32
     Dim ret2 As Int32
     Dim dgv As DataGridView
@@ -29,8 +28,8 @@ Public Class Form1
     Dim aia As Int32 = 1
     Dim cteConfiguration As String = ""
     Dim cteInvertedConfiguration As String = ""
-    Dim O2RefDict As New Dictionary(Of String, Integer)
-    Dim hnf, htran As String
+    Dim O2RefDict = Nothing
+    Dim hnf, htran, vleCo, vleNox As String
 
     Enum State                  'State Machine of the downloading process
         DataLoading = 1
@@ -100,14 +99,7 @@ Public Class Form1
         Dim grandParentPath As String = Directory.GetParent(Directory.GetParent(exePath).FullName).FullName
         Dim chimneyName As String = MySharedMethod.GetChimneyName(Convert.ToInt16(section.ToString()))
         Dim reportPath As String = Path.Combine(grandParentPath, "report", chimneyName)
-
-        If Not Directory.Exists(reportPath) Then
-            Directory.CreateDirectory(reportPath)
-        End If
-
-        If Not Directory.Exists(reportPath) Then
-            Directory.CreateDirectory(reportPath)
-        End If
+        Dim isCte As Byte = 0
 
         Dim startDate As Date
         Dim endDate As Date
@@ -164,8 +156,8 @@ Public Class Form1
                                                            End Select
                                                        End Sub)                                                                                                                         'Refresh the GUI when a change in the state occours
 
-        Dim dataTable1 As DataTable
-        Dim dataTable2 As DataTable
+        Dim dataTable1 As DataTable = Nothing
+        Dim dataTable2 As DataTable = Nothing
 
         If Not CheckBox1.Checked Then
             aia = 0
@@ -173,12 +165,25 @@ Public Class Form1
 
         If ComboBox3.Visible Then
             isCte = 1
-            O2RefDict.Add("cogenerativo", 15)
-            O2RefDict.Add("caldaie", 3)
+
+            If O2RefDict Is Nothing Then
+                O2RefDict = New Dictionary(Of String, Integer)
+                O2RefDict.Add("cogenerativo", 15)
+                O2RefDict.Add("caldaia", 3)
+            End If
+
             Dim invertedIndex As Byte
-            invertedIndex = If(ComboBox3.SelectedIndex = 0, 1, 0)
-            cteConfiguration = LCase(ComboBox3.SelectedItem)
+            invertedIndex = If(GetComboBoxSelectedIndex(ComboBox3) = 0, 1, 0)
+            cteConfiguration = LCase(GetComboBoxSelectedItem(ComboBox3))
             cteInvertedConfiguration = LCase(ComboBox3.Items(invertedIndex).ToString())
+        End If
+
+        If isCte Then
+            reportPath = Path.Combine(grandParentPath, "report", "E3")
+        End If
+
+        If Not Directory.Exists(reportPath) Then
+            Directory.CreateDirectory(reportPath)
         End If
 
         While (startDate <= endDate)
@@ -195,14 +200,21 @@ Public Class Form1
                     dataTable1 = GetFirstBollaTable(barProgress, startDate, endDate, section, reportType)                                                                          'Get the data from the database and assign to first data table structure. The function is runned in an other trhead in order to allow the GUI to refresh properly
                     dataTable2 = GetSecondBollaTable(barProgress, startDate, endDate, section, reportType)                                                                        'Get the data from the database and assign to second data table structure
                 Else
-                    'TODO
-
+                    MessageBox.Show("Errore nella scelta della configurazione del camino.", "Avviso", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                    EnableFormSafe(Me)
                 End If
 
             Else
-                dataTable1 = GetFirstCaminiTable(barProgress, startDate, endDate, section, reportType)
-                dataTable2 = GetSecondCaminiTable(barProgress, startDate, endDate, section, reportType)
-                preRenderFirstTable(section)
+                If isCte = 0 Then
+                    dataTable1 = GetFirstCaminiTable(barProgress, startDate, endDate, section, reportType)
+                    dataTable2 = GetSecondCaminiTable(barProgress, startDate, endDate, section, reportType)
+                    preRenderFirstTable(section)
+                ElseIf isCte = 1 Then
+                    dataTable1 = GetFirstCTETable(barProgress, startDate, endDate, section, reportType)
+                    dataTable2 = GetSecondCTETable(barProgress, startDate, endDate, section, reportType)
+                Else
+                    'TODO
+                End If
             End If
 
             If dataTable1 Is Nothing Then
@@ -221,23 +233,33 @@ Public Class Form1
                 UpdateDgvDataSource(dataTable2, dgv2)                                                                                                                                   'Bind the data to the second DataGridView
             End If
 
-            'UpdateDgvStatus(True, dgv)
-            'UpdateDgvStatus(False, dgv)                                                                                             
-            'UpdateDgvStatus(True, dgv2)
-            'UpdateDgvStatus(False, dgv2)
-
-
             If bolla = 0 Then
                 downloadReportFlussi(StatusProgress, startDate, endDate, reportPath)                                                                                                    'Download the reports of the selected years(months).
 
             ElseIf bolla = 1 Then
+
                 downloadReportBolla(StatusProgress, startDate, endDate, reportPath)
+
             Else
+
+
                 If reportType = 0 Then
-                    downloadYearlyReportCamini(StatusProgress, startDate, endDate, reportPath)
+                    If (isCte = 0) Then
+                        downloadYearlyReportCamini(StatusProgress, startDate, endDate, reportPath)
+                    ElseIf (isCte = 1) Then
+                        downloadYearlyReportCTE(StatusProgress, startDate, endDate, reportPath)
+                    End If
+
                 ElseIf reportType = 1 Then
-                    downloadMonthlyReportCamini(StatusProgress, startDate, endDate, reportPath)
+
+                    If (isCte = 0) Then
+                        downloadMonthlyReportCamini(StatusProgress, startDate, endDate, reportPath)
+                    ElseIf (isCte = 1) Then
+                        downloadMonthlyReportCTE(StatusProgress, startDate, endDate, reportPath)
+                    End If
+
                 End If
+
             End If
 
             Dim deltaTime As String
@@ -726,7 +748,7 @@ Public Class Form1
 
                 If (IsNumeric(reader("CO"))) Then
                     If (Convert.ToDouble(reader("CO")) >= 0) Then
-                        dr("CO") = String.Format("{0:n2}", reader("CO"))
+                        dr("CO") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("CO"))
                     Else
                         dr("CO") = "N.A."
                     End If
@@ -737,7 +759,7 @@ Public Class Form1
 
                 If (IsNumeric(reader("NOX"))) Then
                     If (Convert.ToDouble(reader("NOX")) >= 0) Then
-                        dr("NOX") = String.Format("{0:n2}", reader("NOX"))
+                        dr("NOX") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("NOX"))
                     Else
                         dr("NOX") = "N.A."
                     End If
@@ -749,7 +771,7 @@ Public Class Form1
 
                 If (IsNumeric(reader("SO2"))) Then
                     If (Convert.ToDouble(reader("SO2")) >= 0) Then
-                        dr("SO2") = String.Format("{0:n2}", reader("SO2"))
+                        dr("SO2") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("SO2"))
 
                     Else
                         dr("SO2") = "N.A."
@@ -762,7 +784,7 @@ Public Class Form1
 
                 If (IsNumeric(reader("POLVERI"))) Then
                     If (Convert.ToDouble(reader("POLVERI")) > 0) Then
-                        dr("POLVERI") = String.Format("{0:n2}", reader("POLVERI"))
+                        dr("POLVERI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("POLVERI"))
                     Else
                         dr("POLVERI") = "N.A."
                     End If
@@ -773,7 +795,7 @@ Public Class Form1
 
                 If (IsNumeric(reader("COV"))) Then
                     If (Convert.ToDouble(reader("COV")) > 0) Then
-                        dr("COV") = String.Format("{0:n2}", reader("COV"))
+                        dr("COV") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("COV"))
                     Else
                         dr("COV") = "N.A."
                     End If
@@ -783,7 +805,7 @@ Public Class Form1
                 '      If ((SelectedDate.Value > datanh3) And (String.Equals(Sezione.Text, "6"))) Then
                 If (IsNumeric(reader("NH3"))) Then
                     If (Convert.ToDouble(reader("NH3")) > 0) Then
-                        dr("NH3") = String.Format("{0:n2}", reader("NH3"))
+                        dr("NH3") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("NH3"))
                     Else
                         dr("NH3") = "N.A."
                     End If
@@ -796,13 +818,13 @@ Public Class Form1
                 'If (String.Equals(Sezione.Text, "6")) Then
 
                 'End If
-                dr("O2") = String.Format("{0:n2}", reader("O2"))
-                dr("QFUMI") = String.Format("{0:n2}", reader("QFUMI"))
-                dr("TFUMI") = String.Format("{0:n2}", reader("TFUMI"))
-                dr("PFUMI") = String.Format("{0:n2}", reader("PFUMI"))
-                dr("H2O") = String.Format("{0:n2}", reader("H2O"))
-                dr("O2RIF") = String.Format("{0:n2}", reader("O2RIF"))
-                'dr("MWE") = String.Format("{0:n2}", reader("MWE"))
+                dr("O2") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("O2"))
+                dr("QFUMI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("QFUMI"))
+                dr("TFUMI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("TFUMI"))
+                dr("PFUMI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("PFUMI"))
+                dr("H2O") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("H2O"))
+                dr("O2RIF") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("O2RIF"))
+                'dr("MWE") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"),"{0:n2}", reader("MWE"))
 
                 dt.Rows.Add(dr)
                 dr = dt.NewRow()
@@ -878,11 +900,11 @@ Public Class Form1
         dt.Columns.Add(New Data.DataColumn("COV_VLE", GetType(String)))
         dt.Columns.Add(New Data.DataColumn("DISP_COV", GetType(String)))
         dt.Columns.Add(New Data.DataColumn("IS_BOLD_COV", GetType(Integer)))
-        dt.Columns.Add(New Data.DataColumn("O2_MIS", GetType(String)))
-        dt.Columns.Add(New Data.DataColumn("O2_RIF", GetType(String)))
         dt.Columns.Add(New Data.DataColumn("NH3_IC", GetType(String)))
         dt.Columns.Add(New Data.DataColumn("NH3_VLE", GetType(String)))
         dt.Columns.Add(New Data.DataColumn("DISP_NH3", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("O2_MIS", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("O2_RIF", GetType(String)))
         dt.Columns.Add(New Data.DataColumn("TFUMI", GetType(String)))
         dt.Columns.Add(New Data.DataColumn("PFUMI", GetType(String)))
         dt.Columns.Add(New Data.DataColumn("ORE_NF", GetType(String)))
@@ -961,48 +983,48 @@ Public Class Form1
             Try
                 dr("IDX_REPORT") = reader("IDX_REPORT")
                 dr("INS_ORDER") = String.Format("{0:n0}", reader("INS_ORDER"))
-                dr("ORA") = reader("ORA") 'String.Format("{0:n2}", reader("NOX"))
-                dr("NOX_IC") = String.Format("{0:n2}", reader("NOX_IC"))
-                dr("NOX_VLE") = String.Format("{0:n2}", reader("NOX_VLE"))
-                dr("DISP_NOX") = String.Format("{0:n2}", reader("DISP_NOX"))
+                dr("ORA") = reader("ORA") 'String.Format(CultureInfo.CreateSpecificCulture("it-IT"),"{0:n2}", reader("NOX"))
+                dr("NOX_IC") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("NOX_IC"))
+                dr("NOX_VLE") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("NOX_VLE"))
+                dr("DISP_NOX") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("DISP_NOX"))
                 dr("IS_BOLD_NOX") = reader("IS_BOLD_NOX")
-                dr("CO_IC") = String.Format("{0:n2}", reader("CO_IC"))
-                dr("CO_VLE") = String.Format("{0:n2}", reader("CO_VLE"))
-                dr("DISP_CO") = String.Format("{0:n2}", reader("DISP_CO"))
+                dr("CO_IC") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("CO_IC"))
+                dr("CO_VLE") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("CO_VLE"))
+                dr("DISP_CO") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("DISP_CO"))
                 'bold= superi segnalati in rosso nel mensile)
                 dr("IS_BOLD_CO") = reader("IS_BOLD_CO")
-                dr("SO2_IC") = String.Format("{0:n2}", reader("SO2_IC"))
-                dr("SO2_VLE") = String.Format("{0:n2}", reader("SO2_VLE"))
-                dr("DISP_SO2") = String.Format("{0:n2}", reader("DISP_SO2"))
+                dr("SO2_IC") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("SO2_IC"))
+                dr("SO2_VLE") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("SO2_VLE"))
+                dr("DISP_SO2") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("DISP_SO2"))
                 dr("IS_BOLD_SO2") = reader("IS_BOLD_SO2")
-                dr("POLVERI_IC") = String.Format("{0:n2}", reader("POLVERI_IC"))
-                dr("POLVERI_VLE") = String.Format("{0:n2}", reader("POLVERI_VLE"))
-                dr("DISP_POLVERI") = String.Format("{0:n2}", reader("DISP_POLVERI"))
+                dr("POLVERI_IC") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("POLVERI_IC"))
+                dr("POLVERI_VLE") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("POLVERI_VLE"))
+                dr("DISP_POLVERI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("DISP_POLVERI"))
                 dr("IS_BOLD_POLVERI") = reader("IS_BOLD_POLVERI")
 
-                dr("COV_IC") = String.Format("{0:n2}", reader("COV_IC"))
-                dr("COV_VLE") = String.Format("{0:n2}", reader("COV_VLE"))
-                dr("DISP_COV") = String.Format("{0:n2}", reader("DISP_COV"))
+                dr("COV_IC") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("COV_IC"))
+                dr("COV_VLE") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("COV_VLE"))
+                dr("DISP_COV") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("DISP_COV"))
 
                 'Inserimento colonna bold (per il supero dell'inquinante COV) I limiti VLE del COV sono presenti solo nella nuova AIA. (Mensile e annuale)
                 dr("IS_BOLD_COV") = reader("IS_BOLD_COV")
 
-                dr("O2_MIS") = String.Format("{0:n2}", reader("O2_MIS"))
-                dr("O2_RIF") = String.Format("{0:n2}", reader("O2_RIF"))
-                dr("TFUMI") = String.Format("{0:n2}", reader("TFUMI"))
-                dr("PFUMI") = String.Format("{0:n2}", reader("PFUMI"))
+                dr("O2_MIS") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("O2_MIS"))
+                dr("O2_RIF") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("O2_RIF"))
+                dr("TFUMI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("TFUMI"))
+                dr("PFUMI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("PFUMI"))
                 dr("ORE_NF") = reader("ORE_NF")
-                dr("QFUMI") = String.Format("{0:n2}", reader("QFUMI"))
-                dr("UFUMI") = String.Format("{0:n2}", reader("UFUMI"))
-                dr("PORTATA_CO") = String.Format("{0:n2}", reader("PORTATA_CO"))
-                dr("PORTATA_NOX") = String.Format("{0:n2}", reader("PORTATA_NOX"))
-                dr("PORTATA_SO2") = String.Format("{0:n2}", reader("PORTATA_SO2"))
-                dr("PORTATA_POLVERI") = String.Format("{0:n2}", reader("PORTATA_POLVERI"))
-                dr("PORTATA_COV") = String.Format("{0:n2}", reader("PORTATA_COV"))
-                dr("PORTATA_NH3") = String.Format("{0:n2}", reader("PORTATA_NH3"))
-                dr("NH3_IC") = String.Format("{0:n2}", reader("NH3_IC"))
-                dr("NH3_VLE") = String.Format("{0:n2}", reader("NH3_VLE"))
-                dr("DISP_NH3") = String.Format("{0:n2}", reader("DISP_NH3"))
+                dr("QFUMI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("QFUMI"))
+                dr("UFUMI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("UFUMI"))
+                dr("PORTATA_CO") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("PORTATA_CO"))
+                dr("PORTATA_NOX") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("PORTATA_NOX"))
+                dr("PORTATA_SO2") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("PORTATA_SO2"))
+                dr("PORTATA_POLVERI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("PORTATA_POLVERI"))
+                dr("PORTATA_COV") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("PORTATA_COV"))
+                dr("PORTATA_NH3") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("PORTATA_NH3"))
+                dr("NH3_IC") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("NH3_IC"))
+                dr("NH3_VLE") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("NH3_VLE"))
+                dr("DISP_NH3") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("DISP_NH3"))
 
                 dt.Rows.Add(dr)
                 dr = dt.NewRow()
@@ -1166,7 +1188,7 @@ Public Class Form1
                     End If
 
                     Dim availability As Double
-                    dr("SO2_SECCO") = String.Format("{0:n2}", reader("SO2_SECCO"))
+                    dr("SO2_SECCO") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("SO2_SECCO"))
                     dr("SO2_AVAIL") = String.Format("{0:0.00}", reader("SO2_AVAIL")) & "%"
                     If (Double.TryParse(reader("SO2_AVAIL").ToString, availability)) Then
                         If (availability < 70) Then
@@ -1175,7 +1197,7 @@ Public Class Form1
                     End If
 
 
-                    dr("CO_SECCO") = String.Format("{0:n2}", reader("CO_SECCO"))
+                    dr("CO_SECCO") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("CO_SECCO"))
                     dr("CO_AVAIL") = String.Format("{0:0.00}", reader("CO_AVAIL")) & "%"
                     If (Double.TryParse(reader("CO_AVAIL").ToString, availability)) Then
                         If (availability < 70) Then
@@ -1183,7 +1205,7 @@ Public Class Form1
                         End If
                     End If
 
-                    dr("NOX_SECCO") = String.Format("{0:n2}", reader("NOX_SECCO"))
+                    dr("NOX_SECCO") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("NOX_SECCO"))
                     dr("NOX_AVAIL") = String.Format("{0:0.00}", reader("NOX_AVAIL")) & "%"
                     If (Double.TryParse(reader("NOX_AVAIL").ToString, availability)) Then
                         If (availability < 70) Then
@@ -1191,7 +1213,7 @@ Public Class Form1
                         End If
                     End If
 
-                    dr("POL_SECCO") = String.Format("{0:n2}", reader("POL_SECCO"))
+                    dr("POL_SECCO") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("POL_SECCO"))
                     dr("POL_AVAIL") = String.Format("{0:0.00}", reader("POL_AVAIL")) & "%"
                     If (Double.TryParse(reader("POL_AVAIL").ToString, availability)) Then
                         If (availability < 70) Then
@@ -1199,7 +1221,7 @@ Public Class Form1
                         End If
                     End If
 
-                    dr("COV_SECCO") = String.Format("{0:n2}", reader("COV_SECCO"))
+                    dr("COV_SECCO") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("COV_SECCO"))
                     dr("COV_AVAIL") = String.Format("{0:0.00}", reader("COV_AVAIL")) & "%"
                     If (Double.TryParse(reader("COV_AVAIL").ToString, availability)) Then
                         If (availability < 70) Then
@@ -1270,7 +1292,7 @@ Public Class Form1
             Return dt
         End Try
 
-        progress.Report(State.DataLoading)
+
         dt.Columns.Add(New Data.DataColumn("IDX_REPORT", GetType(Double)))
         dt.Columns.Add(New Data.DataColumn("INS_ORDER", GetType(Integer)))
         dt.Columns.Add(New Data.DataColumn("ORA", GetType(String)))
@@ -1382,15 +1404,15 @@ Public Class Form1
 
                     If result < 0 Then
 
-                        dr("SO2_SECCO") = String.Format("{0:n2}", reader("SO2_SECCO"))
+                        dr("SO2_SECCO") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("SO2_SECCO"))
                         dr("SO2_AVAIL") = String.Format("{0:##}", count1 / max_ore * 100) & "%"
-                        dr("CO_SECCO") = String.Format("{0:n2}", reader("CO_SECCO"))
+                        dr("CO_SECCO") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("CO_SECCO"))
                         dr("CO_AVAIL") = String.Format("{0:##}", count2 / max_ore * 100) & "%"
-                        dr("NOX_SECCO") = String.Format("{0:n2}", reader("NOX_SECCO"))
+                        dr("NOX_SECCO") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("NOX_SECCO"))
                         dr("NOX_AVAIL") = String.Format("{0:##}", count3 / max_ore * 100) & "%"
-                        dr("POL_SECCO") = String.Format("{0:n2}", reader("POL_SECCO"))
+                        dr("POL_SECCO") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("POL_SECCO"))
                         dr("POL_AVAIL") = String.Format("{0:##}", count4 / max_ore * 100) & "%"
-                        dr("COV_SECCO") = String.Format("{0:n2}", reader("COV_SECCO"))
+                        dr("COV_SECCO") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("COV_SECCO"))
                         dr("COV_AVAIL") = String.Format("{0:##}", count5 / max_ore * 100) & "%"
                         dr("FUMI_SECCO") = String.Format(nfi, "{0:0}", reader("FUMI_SECCO"))
                         dr("FUMI_AVAIL") = String.Format("{0:##}", count6 / max_ore * 100) & "%"
@@ -1402,15 +1424,15 @@ Public Class Form1
                         End If
 
                     Else
-                        dr("SO2_SECCO") = String.Format("{0:n2}", reader("SO2_SECCO"))
+                        dr("SO2_SECCO") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("SO2_SECCO"))
                         dr("SO2_AVAIL") = String.Format("{0:##}", (count1 / max_ore * 100) / 7) & "%"
-                        dr("CO_SECCO") = String.Format("{0:n2}", reader("CO_SECCO"))
+                        dr("CO_SECCO") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("CO_SECCO"))
                         dr("CO_AVAIL") = String.Format("{0:##}", (count2 / max_ore * 100) / 7) & "%"
-                        dr("NOX_SECCO") = String.Format("{0:n2}", reader("NOX_SECCO"))
+                        dr("NOX_SECCO") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("NOX_SECCO"))
                         dr("NOX_AVAIL") = String.Format("{0:##}", (count3 / max_ore * 100) / 7) & "%"
-                        dr("POL_SECCO") = String.Format("{0:n2}", reader("POL_SECCO"))
+                        dr("POL_SECCO") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("POL_SECCO"))
                         dr("POL_AVAIL") = String.Format("{0:##}", (count4 / max_ore * 100) / 7) & "%"
-                        dr("COV_SECCO") = String.Format("{0:n2}", reader("COV_SECCO"))
+                        dr("COV_SECCO") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("COV_SECCO"))
                         dr("COV_AVAIL") = String.Format("{0:##}", (count5 / max_ore * 100) / 7) & "%"
                         dr("FUMI_SECCO") = String.Format(nfi, "{0:0}", reader("FUMI_SECCO"))
                         dr("FUMI_AVAIL") = String.Format("{0:##}", (count6 / max_ore * 100) / 7) & "%"
@@ -1454,7 +1476,7 @@ Public Class Form1
 
     End Function
 
-    Private Function getFirstCTETable(progress As Progress(Of Integer), startTime As DateTime, endTime As DateTime, section As Int32, ByVal type As Int32) As Data.DataTable
+    Private Function GetFirstCTETable(progress As Progress(Of Integer), startTime As DateTime, endTime As DateTime, section As Int32, ByVal type As Int32) As Data.DataTable
 
         Dim dt As New Data.DataTable()
         Dim commandCTE As System.Data.SqlClient.SqlCommand
@@ -1463,12 +1485,25 @@ Public Class Form1
         Dim queriesCount As Integer = 4
         Dim progressStep As Integer = 100 \ queriesCount
         Dim methodName As String = GetCurrentMethod()
+        Dim retLong As Long
+
+        Try
+            ' Tenta di aprire la connessione
+            connectionCTE.Open()
+        Catch ex As Exception
+            ' Gestione degli errori
+            MessageBox.Show("Errore durante la connessione al database: " & ex.Message, "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            dt = Nothing
+            Return dt
+        End Try
+
 
         If reportType = 0 Then                                                      ' It was needed thanks to the genius who wrote the logics in the portal :))
             type = 3
         ElseIf reportType = 1 Then
             type = 2
         End If
+
 
         dt.Columns.Add(New Data.DataColumn("INTESTAZIONE", GetType(String)))
         dt.Columns.Add(New Data.DataColumn("CO", GetType(String)))
@@ -1484,8 +1519,21 @@ Public Class Form1
         dt.Columns.Add(New Data.DataColumn("O2RIF", GetType(String)))
         dt.Columns.Add(New Data.DataColumn("MWE", GetType(String)))
 
+        queryNumber += 1
+        progress.Report(queryNumber * progressStep)
+
         Dim reader As System.Data.SqlClient.SqlDataReader
-        Dim testCMD As Data.SqlClient.SqlCommand = New Data.SqlClient.SqlCommand("sp_AQMSNT_FILL_ARPA_REPORT_WEB2017", connectionCTE)
+
+        Dim storedProcedureName As String = If(startTime >= "01/01/2018", "sp_AQMSNT_FILL_ARPA_REPORT_WEB", "sp_AQMSNT_FILL_ARPA_REPORT_WEB2017")
+        Dim testCMD As New Data.SqlClient.SqlCommand(storedProcedureName, connectionCTE)
+
+        If startTime >= "01/01/2018" Then
+            testCMD.Parameters.Add("@aia", Data.SqlDbType.Int, 11)
+            testCMD.Parameters("@aia").Direction = Data.ParameterDirection.Input
+            testCMD.Parameters("@aia").Value = aia
+        End If
+
+
         testCMD.CommandType = Data.CommandType.StoredProcedure
         testCMD.Parameters.Add("@idsez", Data.SqlDbType.Int, 11)
         testCMD.Parameters("@idsez").Direction = Data.ParameterDirection.Input
@@ -1495,11 +1543,7 @@ Public Class Form1
         testCMD.Parameters("@data").Direction = Data.ParameterDirection.Input
         testCMD.Parameters("@data").Value = startTime
 
-        If startTime >= "01/01/2018" Then
-            testCMD.Parameters.Add("@aia", Data.SqlDbType.Int, 11)
-            testCMD.Parameters("@aia").Direction = Data.ParameterDirection.Input
-            testCMD.Parameters("@aia").Value = aia
-        End If
+
 
         testCMD.Parameters.Add("@tipoestrazione", Data.SqlDbType.Int, 11)
         testCMD.Parameters("@tipoestrazione").Direction = Data.ParameterDirection.Input
@@ -1517,38 +1561,233 @@ Public Class Form1
         testCMD.Parameters("@H_TRANS").Direction = Data.ParameterDirection.Output
         testCMD.ExecuteScalar()
 
-        ret = testCMD.Parameters("@retval").Value
+        retLong = testCMD.Parameters("@retval").Value
         hnf = testCMD.Parameters("@HNF").Value.ToString()
         htran = testCMD.Parameters("@H_TRANS").Value.ToString()
 
-        Dim log_statement As String = "SELECT * FROM [ARPA_REPORT_WEB] WHERE IDX_REPORT = " & ret.ToString() & " ORDER BY N_RIGA"
+        queryNumber += 1
+        progress.Report(queryNumber * progressStep)
+
+        Dim log_statement As String = "SELECT * FROM [ARPA_REPORT_WEB] WHERE IDX_REPORT = " & retLong.ToString() & " ORDER BY N_RIGA"
         commandCTE = New System.Data.SqlClient.SqlCommand(log_statement, connectionCTE)
         reader = commandCTE.ExecuteReader()
         Dim dr As Data.DataRow = dt.NewRow()
         While reader.Read()
             dr("INTESTAZIONE") = reader("INTESTAZIONE")
-            dr("CO") = String.Format("{0:n2}", reader("CO"))
-            dr("NOX") = String.Format("{0:n2}", reader("NOX"))
-            dr("SO2") = String.Format("{0:n2}", reader("SO2"))
-            dr("POLVERI") = String.Format("{0:n2}", reader("POLVERI"))
-            dr("COT") = String.Format("{0:n2}", reader("COT"))
-
-            dr("QFUMI") = String.Format("{0:n2}", reader("QFUMI"))
-            dr("O2") = String.Format("{0:n2}", reader("O2"))
-            dr("TFUMI") = String.Format("{0:n2}", reader("TFUMI"))
-            dr("PFUMI") = String.Format("{0:n2}", reader("PFUMI"))
-            dr("H2O") = String.Format("{0:n2}", reader("H2O"))
-            dr("O2RIF") = String.Format("{0:n2}", reader("O2RIF"))
-            dr("MWE") = String.Format("{0:n2}", reader("MWE"))
+            dr("CO") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("CO"))
+            dr("NOX") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("NOX"))
+            dr("SO2") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("SO2"))
+            dr("POLVERI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("POLVERI"))
+            dr("COT") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("COT"))
+            dr("QFUMI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("QFUMI"))
+            dr("O2") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("O2"))
+            dr("TFUMI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("TFUMI"))
+            dr("PFUMI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("PFUMI"))
+            dr("H2O") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("H2O"))
+            dr("O2RIF") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("O2RIF"))
+            dr("MWE") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("MWE"))
             dt.Rows.Add(dr)
             dr = dt.NewRow()
         End While
-        'IDReport.Value = ret
+
+        queryNumber += 1
+        progress.Report(queryNumber * progressStep)
+
         Return dt
 
     End Function
 
+    Private Function GetSecondCTETable(progress As Progress(Of Integer), startTime As DateTime, endTime As DateTime, section As Int32, ByVal type As Int32) As Data.DataTable
 
+        Dim dt As New Data.DataTable()
+        Dim commandCTE As System.Data.SqlClient.SqlCommand
+        Dim connectionCTE As New SqlConnection(connectionStringCTE)
+        Dim queryNumber As Integer = 0
+        Dim queriesCount As Integer = 4
+        Dim progressStep As Integer = 100 \ queriesCount
+        Dim methodName As String = GetCurrentMethod()
+        Dim retLong As Long
+        Dim dataType As String = " ORDER BY INS_ORDER"
+        Dim avgType As String
+
+        Try
+            ' Tenta di aprire la connessione
+            connectionCTE.Open()
+        Catch ex As Exception
+            ' Gestione degli errori
+            MessageBox.Show("Errore durante la connessione al database: " & ex.Message, "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            dt = Nothing
+            Return dt
+        End Try
+
+
+        If reportType = 0 Then                                                      ' It was needed thanks to the genius who wrote the logics in the portal :))
+            type = 3
+            avgType = "Media Annuale"
+        ElseIf reportType = 1 Then
+            type = 2
+            avgType = "Media Mensile"
+        Else
+            dt = Nothing
+            Return dt
+        End If
+
+
+        dt.Columns.Add(New Data.DataColumn("IDX_REPORT", GetType(Double)))
+        dt.Columns.Add(New Data.DataColumn("INS_ORDER", GetType(Integer)))
+        dt.Columns.Add(New Data.DataColumn("ORA", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("NOX_IC", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("NOX_VLE", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("DISP_NOX", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("IS_BOLD_NOX", GetType(Integer)))
+        dt.Columns.Add(New Data.DataColumn("CO_IC", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("CO_VLE", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("DISP_CO", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("IS_BOLD_CO", GetType(Integer)))
+        dt.Columns.Add(New Data.DataColumn("SO2_IC", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("SO2_VLE", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("DISP_SO2", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("IS_BOLD_SO2", GetType(Integer)))
+        dt.Columns.Add(New Data.DataColumn("POLVERI_IC", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("POLVERI_VLE", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("DISP_POLVERI", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("IS_BOLD_POLVERI", GetType(Integer)))
+        dt.Columns.Add(New Data.DataColumn("COT_IC", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("COT_VLE", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("DISP_COT", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("O2_MIS", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("O2_RIF", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("TFUMI", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("PFUMI", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("ORE_NF", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("QFUMI", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("UFUMI", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("MWE", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("QGAS", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("QFUELGAS", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("PORTATA_CO", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("PORTATA_NOX", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("PORTATA_SO2", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("PORTATA_POLVERI", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("PORTATA_COT", GetType(String)))
+
+        Dim reader As System.Data.SqlClient.SqlDataReader
+
+        Dim storedProcedureName As String = If(startTime >= "01/01/2018", "sp_AQMSNT_FILL_ARPA_MESE_ANNO_REPORT", "sp_AQMSNT_FILL_ARPA_MESE_ANNO_REPORT2017")
+        Dim testCMD As New Data.SqlClient.SqlCommand(storedProcedureName, connectionCTE)
+
+        If startTime >= "01/01/2018" Then
+            testCMD.Parameters.Add("@aia", Data.SqlDbType.Int, 11)
+            testCMD.Parameters("@aia").Direction = Data.ParameterDirection.Input
+            testCMD.Parameters("@aia").Value = aia
+        End If
+
+
+        testCMD.CommandType = Data.CommandType.StoredProcedure
+        testCMD.Parameters.Add("@idsez", Data.SqlDbType.Int, 11)
+        testCMD.Parameters("@idsez").Direction = Data.ParameterDirection.Input
+        testCMD.Parameters("@idsez").Value = section
+
+        testCMD.Parameters.Add("@data", Data.SqlDbType.DateTime, 11)
+        testCMD.Parameters("@data").Direction = Data.ParameterDirection.Input
+        testCMD.Parameters("@data").Value = startTime
+
+
+
+        testCMD.Parameters.Add("@IS_MESE", Data.SqlDbType.Int, 11)
+        testCMD.Parameters("@IS_MESE").Direction = Data.ParameterDirection.Input
+        testCMD.Parameters("@IS_MESE").Value = reportType
+
+        testCMD.Parameters.Add("@o2_rif", Data.SqlDbType.Float, 11)
+        testCMD.Parameters("@o2_rif").Direction = Data.ParameterDirection.Input
+        testCMD.Parameters("@o2_rif").Value = O2RefDict(cteConfiguration)
+
+        testCMD.Parameters.Add("@retval", Data.SqlDbType.BigInt, 8)
+        testCMD.Parameters("@retval").Direction = Data.ParameterDirection.Output
+        testCMD.Parameters.Add("@LL_GG_NOX", Data.SqlDbType.Float)
+        testCMD.Parameters("@LL_GG_NOX").Direction = Data.ParameterDirection.Output
+        testCMD.Parameters.Add("@LL_GG_CO", Data.SqlDbType.Float)
+        testCMD.Parameters("@LL_GG_CO").Direction = Data.ParameterDirection.Output
+        testCMD.Parameters.Add("@LL_GG_SO2", Data.SqlDbType.Float)
+        testCMD.Parameters("@LL_GG_SO2").Direction = Data.ParameterDirection.Output
+        testCMD.Parameters.Add("@LL_GG_POLVERI", Data.SqlDbType.Float)
+        testCMD.Parameters("@LL_GG_POLVERI").Direction = Data.ParameterDirection.Output
+        testCMD.ExecuteScalar()
+
+        vleCo = testCMD.Parameters("@LL_GG_CO").Value.ToString()
+        vleNox = testCMD.Parameters("@LL_GG_NOX").Value.ToString()
+        retLong = testCMD.Parameters("@retval").Value
+
+        Dim log_statement As String = "SELECT * FROM [ARPA_WEB_MESE_ANNO_REPORT] WHERE IDX_REPORT = " & retLong.ToString() & dataType
+        commandCTE = New System.Data.SqlClient.SqlCommand(log_statement, connectionCTE)
+        reader = commandCTE.ExecuteReader()
+        Dim dr As Data.DataRow = dt.NewRow()
+        While reader.Read()
+            dr("IDX_REPORT") = reader("IDX_REPORT")
+            dr("INS_ORDER") = String.Format("{0:n0}", reader("INS_ORDER"))
+            dr("ORA") = reader("ORA") 'CountString.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("NOX"))
+            If (Not ((IsDBNull(reader("O2_RIF"))) And reader("ORA") <> "Media Mensile")) Then
+                Dim current_o2rif As Double
+                If (Not (IsDBNull(reader("O2_RIF")))) Then
+                    current_o2rif = Convert.ToDouble(reader("O2_RIF"))
+                Else
+                    current_o2rif = 0.0
+                End If
+
+                If (reader("ORA") = "Media Mensile" Or current_o2rif <> O2RefDict(cteInvertedConfiguration)) Then
+                    dr("NOX_IC") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("NOX_IC"))
+                    dr("NOX_VLE") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("NOX_VLE"))
+                    dr("DISP_NOX") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("DISP_NOX"))
+                    dr("IS_BOLD_NOX") = reader("IS_BOLD_NOX")
+                    dr("CO_IC") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("CO_IC"))
+                    dr("CO_VLE") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("CO_VLE"))
+                    dr("DISP_CO") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("DISP_CO"))
+                    dr("IS_BOLD_CO") = reader("IS_BOLD_CO")
+                    dr("SO2_IC") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("SO2_IC"))
+                    dr("SO2_VLE") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("SO2_VLE"))
+                    dr("DISP_SO2") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("DISP_SO2"))
+                    dr("IS_BOLD_SO2") = reader("IS_BOLD_SO2")
+                    dr("POLVERI_IC") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("POLVERI_IC"))
+                    dr("POLVERI_VLE") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("POLVERI_VLE"))
+                    dr("DISP_POLVERI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("DISP_POLVERI"))
+                    dr("IS_BOLD_POLVERI") = reader("IS_BOLD_POLVERI")
+                    dr("O2_MIS") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("O2_MIS"))
+                    'dr("O2_RIF") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("O2_RIF"))
+                    dr("O2_RIF") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", O2RefDict(cteConfiguration))
+                    dr("TFUMI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("TFUMI"))
+                    dr("PFUMI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("PFUMI"))
+                    dr("ORE_NF") = reader("ORE_NF")
+                    dr("QFUMI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("QFUMI"))
+                    dr("UFUMI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("UFUMI"))
+                    dr("MWE") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("MWE"))
+                    dr("QGAS") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("QGAS"))
+                    dr("QFUELGAS") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("QFUELGAS"))
+                    dr("PORTATA_CO") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("PORTATA_CO"))
+                    dr("PORTATA_NOX") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("PORTATA_NOX"))
+                    dr("PORTATA_SO2") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("PORTATA_SO2"))
+                    dr("PORTATA_POLVERI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("PORTATA_POLVERI"))
+                    dr("COT_IC") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("COT_IC"))
+                    dr("COT_VLE") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("COT_VLE"))
+                    dr("DISP_COT") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("DISP_COT"))
+                    dr("PORTATA_COT") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("PORTATA_COT"))
+
+                    If (reader("ORA") = "Media Annuale") Then
+                        dr("SO2_VLE") = "N.A."
+                        dr("POLVERI_VLE") = "N.A."
+                        dr("NOX_VLE") = "N.A."
+                    End If
+                End If
+            End If
+
+            dt.Rows.Add(dr)
+            dr = dt.NewRow()
+
+        End While
+        
+
+        Return dt
+
+    End Function
 
 
 
@@ -1713,7 +1952,8 @@ Public Class Form1
                 End If
             Case 1
                 wSheet.Range("NomeTabella").Value = "152 MASSICO MENSILE CAMINI DI RAFFINERIA"
-                wSheet.Range("IntervalloDate").Value = "Report Mensile di " + String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MMMM yyyy}", Date.Parse(startDate))
+                Dim startDateFormatted As DateTime = DateTime.Parse(startDate).Date
+                wSheet.Range("IntervalloDate").Value = "Report Mensile del Mese di " & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MMMM yyyy}", startDateFormatted)
                 reportTitle = "152_MASSICO_MESE_" & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MMMM_yyyy}", Date.Parse(startDate))
                 wSheet.Range("B8").Value = "Giorno"
                 wSheet.Range("NOTA_FRASE").Value = ""
@@ -1755,7 +1995,7 @@ Public Class Form1
             wSheet.Range(app).BorderAround()
 
             For kk = 2 To quit
-                If currentRow.Cells(kk).Value.ToString() = "&nbsp;" Then
+                If currentRow.Cells(kk).Value.ToString() = "" Then
                     wSheet.Cells(i + 11, kk) = ""
                 Else
                     If i = 2 Then ' ORA
@@ -1959,7 +2199,7 @@ Public Class Form1
 
             'lunghezza tabella secondaria
             For kk = 2 To quit
-                If currentRow.Cells(kk).Value.ToString() = "&nbsp;" Then
+                If currentRow.Cells(kk).Value.ToString() = "" Then
                     wSheet.Cells(i + tabspace, kk) = ""
                 Else
                     If (startDate < d2 And kk >= 38) Then
@@ -2132,7 +2372,7 @@ Public Class Form1
 
                 For kk = 12 To 17
 
-                    If currentRow.Cells(kk).Value.ToString() = "&nbsp;" Then
+                    If currentRow.Cells(kk).Value.ToString() = "" Then
                         wSheet.Cells(ep + 36, kk) = ""
                     Else
 
@@ -2276,7 +2516,7 @@ Public Class Form1
             'riga)
 
             For kk = 2 To 43
-                If currentRow.Cells(kk).Value.ToString() = "&nbsp;" Then
+                If currentRow.Cells(kk).Value.ToString() = "" Then
                     wSheet.Cells(i + cellOffset, kk) = ""
                 Else
                     If i = 2 Then ' ORA
@@ -2362,7 +2602,8 @@ Public Class Form1
             Case 1
 
                 wSheet.Range("NomeTabella").Value = "152 CONCENTRAZIONI MENSILI CAMINI DI RAFFINERIA"
-                wSheet.Range("IntervalloDate").Value = "Report Mensile di " + String.Format(New CultureInfo("it-IT", False), "{0:MMMM yyyy}", DateTime.Parse(startDate, New CultureInfo("it-IT", False)))
+                Dim startDateFormatted As DateTime = DateTime.Parse(startDate).Date
+                wSheet.Range("IntervalloDate").Value = "Report Mensile del Mese di " & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MMMM yyyy}", startDateFormatted)
                 wSheet.Cells(2, 8).Value = "GIORNO"
                 reportTitle = "152_BOLLA_MESE_" & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MMMM_yyyy}", Date.Parse(startDate))
         End Select
@@ -2468,7 +2709,7 @@ Public Class Form1
             wSheet.Range(app).VerticalAlignment = -4108
 
             For kk = 2 To 14
-                If dgv.Rows(i).Cells(kk).Value.ToString() = "&nbsp;" Then
+                If dgv.Rows(i).Cells(kk).Value.ToString() = "" Then
                     wSheet.Cells(i + 11, kk) = ""
                 Else
                     If i = 2 Then ' ORA
@@ -2531,7 +2772,7 @@ Public Class Form1
             wSheet.Range(app).VerticalAlignment = -4108
 
             For kk = 2 To 14
-                If dgv.Rows(i).Cells(kk).Value.ToString() = "&nbsp;" Then
+                If dgv.Rows(i).Cells(kk).Value.ToString() = "" Then
                     wSheet.Cells(i + cellOffset, kk) = ""
                 Else
                     If i = 2 Then ' ORA
@@ -2553,7 +2794,7 @@ Public Class Form1
 
             colgv = 1
             For tabcounter = 2 To dgv2.Columns.Count
-                If dgv2.Rows(z).Cells(tabcounter - 1).Value.ToString() = "&nbsp;" Then 'Or dgv2.Rows(z).Cells(tabcounter - 1).Value.ToString().Contains("AVG")
+                If dgv2.Rows(z).Cells(tabcounter - 1).Value.ToString() = "" Then 'Or dgv2.Rows(z).Cells(tabcounter - 1).Value.ToString().Contains("AVG")
                     wSheet.Cells(insert_tab, colgv) = ""
                 Else
                     wSheet.Cells(insert_tab, colgv) = dgv2.Rows(z).Cells(tabcounter - 1).Value.ToString()
@@ -2753,7 +2994,7 @@ Public Class Form1
                     Continue For
                 End Try
 
-                If dgv2.Rows(i).Cells(j).Value.ToString() = "&nbsp;" Then
+                If dgv2.Rows(i).Cells(j).Value.ToString() = "" Then
                     wSheet.Cells(i + firstRow, col) = ""
                 Else
                     wSheet.Cells(i + firstRow, col) = dgv2.Rows(i).Cells(j).Value.ToString()
@@ -2775,13 +3016,14 @@ Public Class Form1
                     Continue For
                 End Try
 
-                If dgv.Rows(z).Cells(j).Value.ToString() = "&nbsp;" Then
+                If dgv.Rows(z).Cells(j).Value.ToString() = "" Then
                     wSheet.Cells(insert_tab + z, col) = ""
                 Else
                     wSheet.Cells(insert_tab + z, col) = dgv.Rows(z).Cells(j).Value.ToString()
                 End If
             Next
         Next
+        dgv.ClearSelection()
 
         ComboStatus.Report(State.FinishedReport)
         excel.DisplayAlerts = False
@@ -2817,7 +3059,7 @@ Public Class Form1
             ShowCompletionDialog()
         End If
 
-        dgv.ClearSelection()
+
 
     End Sub
 
@@ -2884,7 +3126,8 @@ Public Class Form1
         End If
 
         wSheet.Range("TitoloTabella").Font.Bold = True
-        wSheet.Range("IntervalloDate").Value = "Report Mensile del Mese di " & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MMMM yyyy}", Date.Parse(startDate, New System.Globalization.CultureInfo("it-IT")))
+        Dim startDateFormatted As DateTime = DateTime.Parse(startDate).Date
+        wSheet.Range("IntervalloDate").Value = "Report Mensile del Mese di " & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MMMM yyyy}", startDateFormatted)
         wSheet.Range("IntervalloDate").Font.Bold = True
 
         wSheet.Range("HNF").Value = hnf
@@ -2966,7 +3209,7 @@ Public Class Form1
 
                 Dim cellText As String = If(dgv2.Rows(i).Cells(j).Value Is Nothing, "", dgv2.Rows(i).Cells(j).Value.ToString())
 
-                If cellText = "&nbsp;" Then
+                If cellText = "" Then
                     wSheet.Cells(i + firstRow, col) = ""
                 Else
                     wSheet.Cells(i + firstRow, col) = cellText
@@ -2990,7 +3233,7 @@ Public Class Form1
 
                 Dim cellText As String = If(dgv.Rows(z).Cells(j).Value Is Nothing, "", dgv.Rows(z).Cells(j).Value.ToString())
 
-                If cellText = "&nbsp;" Then
+                If cellText = "" Then
                     wSheet.Cells(insert_tab + z, col) = ""
                 Else
                     wSheet.Cells(insert_tab + z, col) = cellText
@@ -3037,6 +3280,498 @@ Public Class Form1
 
     End Sub
 
+    Private Sub downloadYearlyReportCTE(ComboStatus As Progress(Of Integer), startDate As Date, endDate As Date, reportDir As String)
+
+        Dim excel As New Microsoft.Office.Interop.Excel.ApplicationClass
+        Dim wBook As Microsoft.Office.Interop.Excel.Workbook
+        Dim wSheet As Microsoft.Office.Interop.Excel.Worksheet
+        Dim exePath As String = Application.StartupPath
+        Dim rootPath As String = Directory.GetParent(Directory.GetParent(exePath).FullName).FullName
+        Dim reportTitle As String = ""
+        Dim cteConfigurationString As String
+        Dim cteInvertedConfigurationString As String
+
+        System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.CreateSpecificCulture("en-US")
+
+        If (cteConfiguration = "cogenerativo") Then
+            cteConfigurationString = "ASSETTO COGENERATIVO - O2 AL 15%"
+            cteInvertedConfigurationString = "Caldaie (O2 al 3%)"
+        Else
+            cteConfigurationString = "ASSETTO CALDAIE - O2 AL 3%"
+            cteInvertedConfigurationString = "Cogenerativo (O2 al 15%)"
+        End If
+
+        wBook = excel.Workbooks.Open(Path.Combine(rootPath, "template", "152_CONC_ANNO_TARANTO.xls"))
+        wSheet = wBook.ActiveSheet()
+
+        Dim percentuale As String
+        Dim i As Integer
+        Dim j As Integer
+        Dim cc As Integer
+        Dim app As String
+        Dim col As Integer
+        Dim insert_tab As Integer
+        cc = 11
+        Dim ci As System.Globalization.CultureInfo
+        ci = System.Globalization.CultureInfo.CreateSpecificCulture("it-IT")
+
+        ComboStatus.Report(State.TableLoading)
+
+        wSheet.Range("NomeTabella").Value = "152_CONC_ANNO"
+        wSheet.Range("NomeTabella").Font.Bold = True
+        wSheet.Range("NomeCentrale").Value = "ENI R&M - Raffineria di Taranto - Camino E3" & Chr(10) & cteConfigurationString
+        wSheet.Range("NomeCentrale").Font.Bold = True
+        wSheet.Range("SisMisura").Value = "Sistema di Monitoraggio delle Emissioni"
+        wSheet.Range("SisMisura").Font.Bold = True
+
+        wSheet.Range("TitoloTabella").Font.Bold = True
+        wSheet.Range("IntervalloDate").Value = "Report Annuale Anno " & Date.Parse(startDate, ci).Year
+        wSheet.Range("IntervalloDate").Font.Bold = True
+        reportTitle = "E3_" & "_CONC_ANNO_" & startDate.Year
+
+        Dim year As Integer = Date.Parse(startDate, ci).Year
+
+        If year < 2018 Then
+            percentuale = "- Dlgs 152 (70%)"
+        ElseIf year = 2018 Then
+            percentuale = ""
+            wSheet.Range("Gestione70").Value = "Dal 1/01/2018 al 31/10/2018 le medie orarie sono validate con disponibilità 70%."
+            wSheet.Range("Gestione75").Value = "Dal 1/11/2018 le medie orarie sono validate con disponibilità al 75%."
+        Else
+            percentuale = "- Dlgs 152 (75%)"
+        End If
+
+
+        wSheet.Range("TitoloTabella").Value = "Report Annuale concentrazioni medie mensili (NOX ,CO ,SO2 ,POLVERI, COT)" & percentuale.ToString()
+
+
+
+
+
+
+        wSheet.Range("HNF").Value = hnf
+        wSheet.Range("HNF").Font.Bold = True
+        wSheet.Range("HTRANS").Value = htran
+        wSheet.Range("HTRANS").Font.Bold = True
+        wSheet.Range("C10").Value = "NORM IC a " & O2RefDict(cteConfiguration) & "% di O2 QAL2"
+        wSheet.Range("F10").Value = "NORM IC a " & O2RefDict(cteConfiguration) & "% di O2 QAL2"
+        wSheet.Range("I10").Value = "NORM IC a " & O2RefDict(cteConfiguration) & "% di O2 QAL2"
+        wSheet.Range("L10").Value = "NORM IC a " & O2RefDict(cteConfiguration) & "% di O2 QAL2"
+        wSheet.Range("O10").Value = "NORM IC a " & O2RefDict(cteConfiguration) & "% di O2 QAL2"
+        wSheet.Range("W8").Value = "Portata Fumi  anidra a " & O2RefDict(cteConfiguration) & "% di O2 (Nm3/h)"
+
+        wSheet.Range("B28").Value = wSheet.Range("B28").Value & cteInvertedConfiguration
+
+        Dim firstRow As Integer
+        Dim firstColumn As String
+        Dim lastColumn As String
+        Dim currentExcelCol As String
+
+
+        If (aia = 1) And (Date.Parse(startDate, New System.Globalization.CultureInfo("it-IT")).Year > "2018") Then
+            Try
+                wSheet.Range("NOTA_FRASE2").Value = ""
+                wSheet.Range("NOTA_FRASE").Value = ""
+            Catch ex As Exception
+            End Try
+        End If
+
+        If (aia = 1) And (Date.Parse(startDate, New System.Globalization.CultureInfo("it-IT")).Year = "2018") Then
+            Try
+                wSheet.Range("NOTA_FRASE2").Value = ""
+            Catch ex As Exception
+            End Try
+        Else
+            Try
+                wSheet.Range("NOTA_FRASE").Value = ""
+            Catch ex As Exception
+            End Try
+
+        End If
+
+        firstRow = wSheet.Range("FirstRow").Row
+        firstColumn = wSheet.Range("FIRST_COLUMN").Address.Split({"$"c}, StringSplitOptions.RemoveEmptyEntries)(0)
+        lastColumn = wSheet.Range("LAST_COLUMN").Address.Split({"$"c}, StringSplitOptions.RemoveEmptyEntries)(0)
+
+        ComboStatus.Report(State.SheetLoading)
+
+        For i = 0 To dgv2.Rows.Count - 1
+
+            ' Seleziona la riga corrente
+            dgv2.Rows(i).Selected = True
+
+            app = firstColumn & (i + firstRow).ToString() & ":" & lastColumn & (i + firstRow).ToString()
+            wSheet.Rows(firstRow + i + 1).Insert()
+            wSheet.Range(firstColumn & firstRow & ":" & lastColumn & firstRow).Copy(wSheet.Range(app))
+
+            ' Aggiunge bordi sottili tranne per la prima e ultima riga
+            If ((i <> dgv2.Rows.Count - 1) And (i <> 0)) Then
+                wSheet.Range(app).Borders(Microsoft.Office.Interop.Excel.XlBordersIndex.xlEdgeTop).Weight = Microsoft.Office.Interop.Excel.XlBorderWeight.xlThin
+            End If
+
+            ' Aggiunge bordo spesso per l'ultima riga
+            If (i = dgv2.Rows.Count - 1) Then
+                wSheet.Range(app).Borders(Microsoft.Office.Interop.Excel.XlBordersIndex.xlEdgeBottom).Weight = Microsoft.Office.Interop.Excel.XlBorderWeight.xlThick
+            End If
+            ' Itera sulle colonne
+            For j = 0 To dgv2.Columns.Count - 1
+                ' Controlla se la colonna inizia con "IS_BOLD"
+                If dgv2.Columns(j).DataPropertyName.StartsWith("IS_BOLD") Then
+                    Dim inquinante = dgv2.Columns(j).DataPropertyName.Split({"IS_BOLD_"}, StringSplitOptions.RemoveEmptyEntries)(0)
+                    currentExcelCol = wSheet.Range(inquinante + "_IC").Address.Split({"$"c}, StringSplitOptions.RemoveEmptyEntries)(0)
+                    app = currentExcelCol + Convert.ToString(i + firstRow) + ":" + currentExcelCol + Convert.ToString(i + firstRow)
+
+                    ' Se la cella è vuota ("&nbsp;"), salta
+                    If Convert.ToString(dgv2.Rows(i).Cells(j).Value) = "" Then
+                        Exit For
+                    Else
+                        ' Imposta il grassetto e il colore in base al valore
+                        wSheet.Range(app).Font.Bold = False
+                        wSheet.Range(app).Interior.Color = Color.White
+                        wSheet.Range(app).Font.Color = Color.Black
+                    End If
+                End If
+
+                ' Prova a ottenere la colonna in Excel, se fallisce continua il ciclo
+                Try
+                    col = wSheet.Range(dgv2.Columns(j).DataPropertyName).Column
+                Catch ex As Exception
+                    Continue For
+                End Try
+
+                ' Se la cella è vuota ("&nbsp;"), scrivi una stringa vuota
+                If dgv2.Rows(i).Cells(j).Value.ToString() = "" Then
+                    wSheet.Cells(i + firstRow, col) = ""
+                Else
+                    wSheet.Cells(i + firstRow, col) = dgv2.Rows(i).Cells(j).Value.ToString()
+                End If
+            Next
+        Next
+
+        insert_tab = wSheet.Range("FIRSTROW_SUMMARY").Row
+
+        For z = 0 To dgv.Rows.Count - 1
+            dgv.Rows(z).Selected = True
+            For j = 0 To dgv.Columns.Count - 1
+                ' Prova a ottenere la colonna in Excel, se fallisce continua il ciclo
+                Try
+                    col = wSheet.Range("SUMM_" + dgv.Columns(j).DataPropertyName).Column
+                Catch ex As Exception
+                    Continue For
+                End Try
+
+                ' Se la cella è vuota ("&nbsp;"), scrivi una stringa vuota
+                If dgv.Rows(z).Cells(j).Value.ToString() = "&nbsp;" Then
+                    wSheet.Cells(insert_tab + z, col) = ""
+                Else
+                    wSheet.Cells(insert_tab + z, col) = dgv.Rows(z).Cells(j).Value.ToString()
+                End If
+            Next
+        Next
+
+        ComboStatus.Report(State.FinishedReport)
+        excel.DisplayAlerts = False
+        Dim reportFileXls = reportTitle & ".xls"
+        Dim reportFilePdf = reportTitle & ".pdf"
+        Dim reportPath = Path.Combine(reportDir, reportFileXls)
+        Dim reportPathPdf = Path.Combine(reportDir, reportFilePdf)
+        excel.DisplayAlerts = False
+        wSheet.PageSetup.LeftMargin = Double.Parse(ConfigurationManager.AppSettings("LeftMargin").ToString)
+        wSheet.PageSetup.RightMargin = Double.Parse(ConfigurationManager.AppSettings("RightMargin").ToString)
+        wSheet.PageSetup.PaperSize = Microsoft.Office.Interop.Excel.XlPaperSize.xlPaperA4
+        wSheet.PageSetup.Orientation = Microsoft.Office.Interop.Excel.XlPageOrientation.xlLandscape
+        wBook.SaveAs(reportPath, Microsoft.Office.Interop.Excel.XlFileFormat.xlWorkbookNormal, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, Microsoft.Office.Interop.Excel.XlSaveAsAccessMode.xlNoChange)
+        wSheet.ExportAsFixedFormat(Microsoft.Office.Interop.Excel.XlFixedFormatType.xlTypePDF, reportPathPdf, Quality:=Microsoft.Office.Interop.Excel.XlFixedFormatQuality.xlQualityStandard, _
+                    IncludeDocProperties:=True, IgnorePrintAreas:=False, _
+                    OpenAfterPublish:=False)
+        ComboStatus.Report(State.FinishedReport)
+        wBook.Close()
+        excel.DisplayAlerts = True
+        excel.Quit()
+
+        Marshal.ReleaseComObject(wSheet)
+        Marshal.ReleaseComObject(wBook)
+
+        Marshal.ReleaseComObject(excel)
+        wSheet = Nothing
+        wBook = Nothing
+        excel = Nothing
+        MySharedMethod.KillAllExcels()
+        System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.CreateSpecificCulture("it-IT")
+
+        If (startDate = endDate) Then
+            
+            ComboStatus.Report(State.Finished)
+            ShowCompletionDialog()
+        End If
+
+
+    End Sub
+
+    Private Sub downloadMonthlyReportCTE(ComboStatus As Progress(Of Integer), startDate As Date, endDate As Date, reportDir As String)
+
+        Dim excel As New Microsoft.Office.Interop.Excel.ApplicationClass
+        Dim wBook As Microsoft.Office.Interop.Excel.Workbook
+        Dim wSheet As Microsoft.Office.Interop.Excel.Worksheet
+        Dim exePath As String = Application.StartupPath
+        Dim rootPath As String = Directory.GetParent(Directory.GetParent(exePath).FullName).FullName
+        Dim reportTitle As String = ""
+        Dim cteConfigurationString As String
+        Dim cteInvertedConfigurationString As String
+
+        System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.CreateSpecificCulture("en-US")
+
+        If (cteConfiguration = "cogenerativo") Then
+            cteConfigurationString = "ASSETTO COGENERATIVO - O2 AL 15%"
+            cteInvertedConfigurationString = "Caldaie (O2 al 3%)"
+        Else
+            cteConfigurationString = "ASSETTO CALDAIE - O2 AL 3%"
+            cteInvertedConfigurationString = "Cogenerativo (O2 al 15%)"
+        End If
+
+        wBook = excel.Workbooks.Open(Path.Combine(rootPath, "template", "152_CONC_MESE_TARANTO.xls"))
+        wSheet = wBook.ActiveSheet()
+
+        Dim percent As String = " "
+        Dim dateToCompare As Date = New Date(2018, 11, 1)
+
+        If (DateTime.Compare(dateToCompare, startDate)) > 0 Then
+            percent = "- Dlgs 152 (70%)"
+        End If
+
+        ComboStatus.Report(State.TableLoading)
+        wSheet.Range("NomeTabella").Value = "152_CONC_MESE"
+        wSheet.Range("NomeTabella").Font.Bold = True
+        wSheet.Range("NomeCentrale").Value = "ENI R&M - Raffineria di Taranto - Camino E3" & Chr(10) & cteConfigurationString
+        wSheet.Range("NomeCentrale").Font.Bold = True
+        wSheet.Range("SisMisura").Value = "Sistema di Monitoraggio delle Emissioni"
+        wSheet.Range("SisMisura").Font.Bold = True
+        wSheet.Range("TitoloTabella").Value = "Report Mensile concentrazioni medie  giornaliere (NOX, CO, SO2, POLVERI, COT) " & percent
+        wSheet.Range("TitoloTabella").Font.Bold = True
+        Dim startDateFormatted As DateTime = DateTime.Parse(startDate).Date
+        wSheet.Range("IntervalloDate").Value = "Report Mensile del Mese di " & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MMMM yyyy}", startDateFormatted)
+        wSheet.Range("IntervalloDate").Font.Bold = True
+        reportTitle = "E3_" & "CONC_MESE_" & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MMMM_yyyy}", Date.Parse(startDate))
+        wSheet.Range("HNF").Value = hnf
+        wSheet.Range("HNF").Font.Bold = True
+        wSheet.Range("HTRANS").Value = htran
+        wSheet.Range("HTRANS").Font.Bold = True
+        wSheet.Range("C10").Value = "NORM IC a " & O2RefDict(cteConfiguration) & "% di O2 QAL2"
+        wSheet.Range("F10").Value = "NORM IC a " & O2RefDict(cteConfiguration) & "% di O2 QAL2"
+        wSheet.Range("I10").Value = "NORM IC a " & O2RefDict(cteConfiguration) & "% di O2 QAL2"
+        wSheet.Range("L10").Value = "NORM IC a " & O2RefDict(cteConfiguration) & "% di O2 QAL2"
+        wSheet.Range("O10").Value = "NORM IC a " & O2RefDict(cteConfiguration) & "% di O2 QAL2"
+        wSheet.Range("W8").Value = "Portata Fumi  anidra a " & O2RefDict(cteConfiguration) & "% di O2 (Nm3/h)"
+
+        wSheet.Range("B28").Value = wSheet.Range("B28").Value & cteInvertedConfiguration
+
+        Dim i As Integer
+        Dim j As Integer
+        Dim cc As Integer = 11
+        Dim cc2 As Integer
+        Dim app As String
+        Dim col As Integer
+        Dim insert_tab As Integer
+        ' Aggiunta modifica parte nuova
+        Dim firstRow As Integer
+        Dim firstColumn As String
+        Dim lastColumn As String
+
+
+        firstRow = wSheet.Range("FirstRow").Row
+        firstColumn = wSheet.Range("FIRST_COLUMN").Address.Split({"$"c}, StringSplitOptions.RemoveEmptyEntries)(0)
+        lastColumn = wSheet.Range("LAST_COLUMN").Address.Split({"$"c}, StringSplitOptions.RemoveEmptyEntries)(0)
+
+        ComboStatus.Report(State.SheetLoading)
+        For i = 0 To dgv2.Rows.Count - 1
+
+            app = "B" & (i + cc).ToString & ":AF" & (i + cc).ToString
+            wSheet.Rows(cc + i + 2).Insert()
+            wSheet.Range("B" & cc & ":AF" & cc).Copy(wSheet.Range(app))
+
+            If ((i <> dgv2.Rows.Count - 1) And (i <> 0)) Then
+                wSheet.Range(app).Borders(Microsoft.Office.Interop.Excel.XlBordersIndex.xlEdgeTop).Weight = Microsoft.Office.Interop.Excel.XlBorderWeight.xlThin
+            End If
+            If (i = dgv2.Rows.Count - 1) Then
+                wSheet.Range(app).Borders(Microsoft.Office.Interop.Excel.XlBordersIndex.xlEdgeBottom).Weight = Microsoft.Office.Interop.Excel.XlBorderWeight.xlThick
+            End If
+            col = 2
+
+            For j = 2 To 37 - 1
+
+
+                If j = 6 Then
+
+                    If dgv2.Rows(i).Cells(j).Value Is Nothing OrElse String.IsNullOrEmpty(dgv2.Rows(i).Cells(j).Value.ToString()) Then
+                        wSheet.Cells(i + 11, col) = ""
+                    Else
+                        app = "C" + Convert.ToString(i + 11) + ":C" + Convert.ToString(i + 11)
+
+                    End If
+
+                    j = j + 1
+
+
+                    If dgv2.Rows(i).Cells(j).Value Is Nothing OrElse String.IsNullOrEmpty(dgv2.Rows(i).Cells(j).Value.ToString()) Then
+                        wSheet.Cells(i + 11, col) = ""
+                    Else
+                        Dim doubleVal As Double = 0
+                        If Double.TryParse(dgv2.Rows(i).Cells(j).Value.ToString(), doubleVal) Then
+                            wSheet.Cells(i + 11, col) = doubleVal
+                        Else
+                            wSheet.Cells(i + 11, col) = dgv2.Rows(i).Cells(j).Value.ToString()
+                        End If
+
+                    End If
+
+
+
+                    col = col + 1
+                ElseIf j = 10 Then
+                    If dgv2.Rows(i).Cells(j).Value Is Nothing OrElse String.IsNullOrEmpty(dgv2.Rows(i).Cells(j).Value.ToString()) Then
+                        wSheet.Cells(i + 11, col) = ""
+                    Else
+                        app = "F" + Convert.ToString(i + 11) + ":F" + Convert.ToString(i + 11)
+                    End If
+                    j = j + 1
+                    If dgv2.Rows(i).Cells(j).Value Is Nothing OrElse String.IsNullOrEmpty(dgv2.Rows(i).Cells(j).Value.ToString()) Then
+                        wSheet.Cells(i + 11, col) = ""
+                    Else
+                        Dim doubleVal As Double = 0
+                        If Double.TryParse(dgv2.Rows(i).Cells(j).Value.ToString(), doubleVal) Then
+                            wSheet.Cells(i + 11, col) = doubleVal
+                        Else
+                            wSheet.Cells(i + 11, col) = dgv2.Rows(i).Cells(j).Value.ToString()
+                        End If
+                    End If
+                    col = col + 1
+                ElseIf j = 14 Then
+                    If dgv2.Rows(i).Cells(j).Value Is Nothing OrElse String.IsNullOrEmpty(dgv2.Rows(i).Cells(j).Value.ToString()) Then
+                        wSheet.Cells(i + 11, col) = ""
+                    Else
+                        app = "I" + Convert.ToString(i + 11) + ":I" + Convert.ToString(i + 11)
+
+                    End If
+                    j = j + 1
+                    If dgv2.Rows(i).Cells(j).Value Is Nothing OrElse String.IsNullOrEmpty(dgv2.Rows(i).Cells(j).Value.ToString()) Then
+                        wSheet.Cells(i + 11, col) = ""
+                    Else
+                        Dim doubleVal As Double = 0
+                        If Double.TryParse(dgv2.Rows(i).Cells(j).Value.ToString(), doubleVal) Then
+                            wSheet.Cells(i + 11, col) = doubleVal
+                        Else
+                            wSheet.Cells(i + 11, col) = dgv2.Rows(i).Cells(j).Value.ToString()
+                        End If
+                    End If
+                    col = col + 1
+                ElseIf j = 18 Then
+                    If dgv2.Rows(i).Cells(j).Value Is Nothing OrElse String.IsNullOrEmpty(dgv2.Rows(i).Cells(j).Value.ToString()) Then
+                        wSheet.Cells(i + 11, col) = ""
+                    Else
+                        app = "L" + Convert.ToString(i + 11) + ":L" + Convert.ToString(i + 11)
+
+                    End If
+                    j = j + 1
+                    If dgv2.Rows(i).Cells(j).Value Is Nothing OrElse String.IsNullOrEmpty(dgv2.Rows(i).Cells(j).Value.ToString()) Then
+                        wSheet.Cells(i + 11, col) = ""
+                    Else
+                        Dim doubleVal As Double = 0
+                        If Double.TryParse(dgv2.Rows(i).Cells(j).Value.ToString(), doubleVal) Then
+                            wSheet.Cells(i + 11, col) = doubleVal
+                        Else
+                            wSheet.Cells(i + 11, col) = dgv2.Rows(i).Cells(j).Value.ToString()
+                        End If
+                    End If
+                    col = col + 1
+                Else
+                    If dgv2.Rows(i).Cells(j).Value Is Nothing OrElse String.IsNullOrEmpty(dgv2.Rows(i).Cells(j).Value.ToString()) Then
+                        wSheet.Cells(i + 11, col) = ""
+                    Else
+                        Dim doubleVal As Double = 0
+                        If Double.TryParse(dgv2.Rows(i).Cells(j).Value.ToString(), doubleVal) Then
+                            wSheet.Cells(i + 11, col) = doubleVal
+                        Else
+                            wSheet.Cells(i + 11, col) = dgv2.Rows(i).Cells(j).Value.ToString()
+                        End If
+                    End If
+                    col = col + 1 'sposta i dati delle colonne
+                End If
+
+
+
+                If j < 16 Then
+                    wSheet.Cells(i + 12, j).BorderAround()
+
+                End If
+                'Tabella sintesi
+            Next
+        Next
+
+        firstRow = wSheet.Range("FirstRow").Row
+        firstColumn = wSheet.Range("FIRST_COLUMN").Address.Split({"$"c}, StringSplitOptions.RemoveEmptyEntries)(0)
+        lastColumn = wSheet.Range("LAST_COLUMN").Address.Split({"$"c}, StringSplitOptions.RemoveEmptyEntries)(0)
+
+
+
+        insert_tab = wSheet.Range("FIRSTROW_SUMMARY").Row
+        '
+        For z = 0 To dgv.Rows.Count - 1
+            dgv.Rows(z).Selected = True
+            For j = 0 To dgv.Columns.Count - 1
+                'SE NON C'E' IL NOME DI COLONNA SUL TEMPLATE CORRISPONDENTE AL NOME SUL DATAGRID SALTA LA SCRITTURA SU TEMPLATE
+                Try
+                    col = wSheet.Range("SUMM_" + dgv.Columns(j).DataPropertyName).Column
+                Catch ex As Exception
+                    Continue For
+                End Try
+
+                If dgv.Rows(z).Cells(j).Value.ToString() = "&nbsp;" Then
+                    wSheet.Cells(insert_tab + z, col) = ""
+                Else
+                    wSheet.Cells(insert_tab + z, col) = dgv.Rows(z).Cells(j).Value.ToString()
+                End If
+
+            Next
+        Next
+
+
+        excel.DisplayAlerts = False
+        Dim reportFileXls = reportTitle & ".xls"
+        Dim reportFilePdf = reportTitle & ".pdf"
+        Dim reportPath = Path.Combine(reportDir, reportFileXls)
+        Dim reportPathPdf = Path.Combine(reportDir, reportFilePdf)
+        excel.DisplayAlerts = False
+        wSheet.PageSetup.LeftMargin = Double.Parse(ConfigurationManager.AppSettings("LeftMargin").ToString)
+        wSheet.PageSetup.RightMargin = Double.Parse(ConfigurationManager.AppSettings("RightMargin").ToString)
+        wSheet.PageSetup.PaperSize = Microsoft.Office.Interop.Excel.XlPaperSize.xlPaperA4
+        wSheet.PageSetup.Orientation = Microsoft.Office.Interop.Excel.XlPageOrientation.xlLandscape
+        wBook.SaveAs(reportPath, Microsoft.Office.Interop.Excel.XlFileFormat.xlWorkbookNormal, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, Microsoft.Office.Interop.Excel.XlSaveAsAccessMode.xlNoChange)
+        wSheet.ExportAsFixedFormat(Microsoft.Office.Interop.Excel.XlFixedFormatType.xlTypePDF, reportPathPdf, Quality:=Microsoft.Office.Interop.Excel.XlFixedFormatQuality.xlQualityStandard, _
+                    IncludeDocProperties:=True, IgnorePrintAreas:=False, _
+                    OpenAfterPublish:=False)
+
+        wBook.Close()
+        excel.DisplayAlerts = True
+        excel.Quit()
+
+        Marshal.ReleaseComObject(wSheet)
+        Marshal.ReleaseComObject(wBook)
+
+        Marshal.ReleaseComObject(excel)
+        wSheet = Nothing
+        wBook = Nothing
+        excel = Nothing
+        MySharedMethod.KillAllExcels()
+        System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.CreateSpecificCulture("it-IT")
+        ComboStatus.Report(State.FinishedReport)
+
+        If (startDate = endDate) Then
+
+            ComboStatus.Report(State.Finished)
+            ShowCompletionDialog()
+        End If
+
+    End Sub
 
 
     Private Sub DisableForm()
@@ -3208,6 +3943,22 @@ Public Class Form1
         End Select
 
     End Sub
+
+    Private Function GetComboBoxSelectedIndex(comboBox As ComboBox) As Integer
+        If comboBox.InvokeRequired Then
+            Return CInt(comboBox.Invoke(New Func(Of ComboBox, Integer)(AddressOf GetComboBoxSelectedIndex), comboBox))
+        Else
+            Return comboBox.SelectedIndex
+        End If
+    End Function
+
+    Private Function GetComboBoxSelectedItem(comboBox As ComboBox) As String
+        If comboBox.InvokeRequired Then
+            Return CStr(comboBox.Invoke(New Func(Of ComboBox, String)(AddressOf GetComboBoxSelectedItem), comboBox))
+        Else
+            Return CStr(comboBox.SelectedItem)
+        End If
+    End Function
 
 End Class
 
