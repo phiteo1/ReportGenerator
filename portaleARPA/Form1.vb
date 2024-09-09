@@ -73,8 +73,6 @@ Public Class Form1
         Dim worker As New BackgroundWorker()
         worker.WorkerReportsProgress = False
         worker.WorkerSupportsCancellation = False
-
-        ' Aggiungi gestori per gli eventi
         AddHandler worker.DoWork, AddressOf mainThread
         AddHandler worker.RunWorkerCompleted, AddressOf reportCompleted
         DisableForm()
@@ -183,7 +181,14 @@ Public Class Form1
         End If
 
         If Not Directory.Exists(reportPath) Then
-            Directory.CreateDirectory(reportPath)
+            Try
+                Directory.CreateDirectory(reportPath)
+            Catch ex As Exception
+                MessageBox.Show("Errore nella creazione della directory.", "Avviso", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                EnableFormSafe(Me)
+                Return
+            End Try
+
         End If
 
         While (startDate <= endDate)
@@ -202,6 +207,7 @@ Public Class Form1
                 Else
                     MessageBox.Show("Errore nella scelta della configurazione del camino.", "Avviso", MessageBoxButtons.OK, MessageBoxIcon.Warning)
                     EnableFormSafe(Me)
+                    Return
                 End If
 
             Else
@@ -213,7 +219,8 @@ Public Class Form1
                     dataTable1 = GetFirstCTETable(barProgress, startDate, endDate, section, reportType)
                     dataTable2 = GetSecondCTETable(barProgress, startDate, endDate, section, reportType)
                 Else
-                    'TODO
+                    MessageBox.Show("Errore nella scelta della configurazione del camino.", "Avviso", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                    EnableFormSafe(Me)
                 End If
             End If
 
@@ -1559,7 +1566,13 @@ Public Class Form1
         testCMD.Parameters("@HNF").Direction = Data.ParameterDirection.Output
         testCMD.Parameters.Add("@H_TRANS", Data.SqlDbType.Int)
         testCMD.Parameters("@H_TRANS").Direction = Data.ParameterDirection.Output
-        testCMD.ExecuteScalar()
+        Try
+            testCMD.ExecuteScalar()
+        Catch ex As Exception
+            Logger.LogError("[" & methodName & "]" & " Errore durante l'esecuzione della stored procedure: ", ex)
+            dt = Nothing
+            Return dt
+        End Try
 
         retLong = testCMD.Parameters("@retval").Value
         hnf = testCMD.Parameters("@HNF").Value.ToString()
@@ -1570,24 +1583,38 @@ Public Class Form1
 
         Dim log_statement As String = "SELECT * FROM [ARPA_REPORT_WEB] WHERE IDX_REPORT = " & retLong.ToString() & " ORDER BY N_RIGA"
         commandCTE = New System.Data.SqlClient.SqlCommand(log_statement, connectionCTE)
-        reader = commandCTE.ExecuteReader()
+
+        Try
+            reader = commandCTE.ExecuteReader()
+        Catch ex As Exception
+            Logger.LogError("[" & methodName & "]" & " Errore durante l'esecuzione della query: ", ex)
+            dt = Nothing
+            Return dt
+        End Try
+
         Dim dr As Data.DataRow = dt.NewRow()
         While reader.Read()
-            dr("INTESTAZIONE") = reader("INTESTAZIONE")
-            dr("CO") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("CO"))
-            dr("NOX") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("NOX"))
-            dr("SO2") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("SO2"))
-            dr("POLVERI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("POLVERI"))
-            dr("COT") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("COT"))
-            dr("QFUMI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("QFUMI"))
-            dr("O2") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("O2"))
-            dr("TFUMI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("TFUMI"))
-            dr("PFUMI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("PFUMI"))
-            dr("H2O") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("H2O"))
-            dr("O2RIF") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("O2RIF"))
-            dr("MWE") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("MWE"))
-            dt.Rows.Add(dr)
-            dr = dt.NewRow()
+            Try
+                dr("INTESTAZIONE") = reader("INTESTAZIONE")
+                dr("CO") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("CO"))
+                dr("NOX") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("NOX"))
+                dr("SO2") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("SO2"))
+                dr("POLVERI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("POLVERI"))
+                dr("COT") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("COT"))
+                dr("QFUMI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("QFUMI"))
+                dr("O2") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("O2"))
+                dr("TFUMI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("TFUMI"))
+                dr("PFUMI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("PFUMI"))
+                dr("H2O") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("H2O"))
+                dr("O2RIF") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("O2RIF"))
+                dr("MWE") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("MWE"))
+                dt.Rows.Add(dr)
+                dr = dt.NewRow()
+            Catch ex As Exception
+                Logger.LogWarning("[" & methodName & "]" & " Errore nella lettura dei dati: ", ex)
+                Continue While
+            End Try
+            
         End While
 
         queryNumber += 1
@@ -1602,7 +1629,7 @@ Public Class Form1
         Dim dt As New Data.DataTable()
         Dim commandCTE As System.Data.SqlClient.SqlCommand
         Dim connectionCTE As New SqlConnection(connectionStringCTE)
-        Dim queryNumber As Integer = 0
+        Dim queryNumber As Integer = 3
         Dim queriesCount As Integer = 4
         Dim progressStep As Integer = 100 \ queriesCount
         Dim methodName As String = GetCurrentMethod()
@@ -1712,7 +1739,14 @@ Public Class Form1
         testCMD.Parameters("@LL_GG_SO2").Direction = Data.ParameterDirection.Output
         testCMD.Parameters.Add("@LL_GG_POLVERI", Data.SqlDbType.Float)
         testCMD.Parameters("@LL_GG_POLVERI").Direction = Data.ParameterDirection.Output
-        testCMD.ExecuteScalar()
+
+        Try
+            testCMD.ExecuteScalar()
+        Catch ex As Exception
+            Logger.LogError("[" & methodName & "]" & " Errore durante l'esecuzione della stored procedure: ", ex)
+            dt = Nothing
+            Return dt
+        End Try
 
         vleCo = testCMD.Parameters("@LL_GG_CO").Value.ToString()
         vleNox = testCMD.Parameters("@LL_GG_NOX").Value.ToString()
@@ -1720,70 +1754,86 @@ Public Class Form1
 
         Dim log_statement As String = "SELECT * FROM [ARPA_WEB_MESE_ANNO_REPORT] WHERE IDX_REPORT = " & retLong.ToString() & dataType
         commandCTE = New System.Data.SqlClient.SqlCommand(log_statement, connectionCTE)
-        reader = commandCTE.ExecuteReader()
+        Try
+            reader = commandCTE.ExecuteReader()
+        Catch ex As SqlException
+            Logger.LogError("[" & methodName & "]" & " Errore durante l'esecuzione della query: ", ex)
+            dt = Nothing
+            Return dt
+
+        End Try
+
         Dim dr As Data.DataRow = dt.NewRow()
+
         While reader.Read()
-            dr("IDX_REPORT") = reader("IDX_REPORT")
-            dr("INS_ORDER") = String.Format("{0:n0}", reader("INS_ORDER"))
-            dr("ORA") = reader("ORA") 'CountString.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("NOX"))
-            If (Not ((IsDBNull(reader("O2_RIF"))) And reader("ORA") <> "Media Mensile")) Then
-                Dim current_o2rif As Double
-                If (Not (IsDBNull(reader("O2_RIF")))) Then
-                    current_o2rif = Convert.ToDouble(reader("O2_RIF"))
-                Else
-                    current_o2rif = 0.0
-                End If
+            Try
+                dr("IDX_REPORT") = reader("IDX_REPORT")
+                dr("INS_ORDER") = String.Format("{0:n0}", reader("INS_ORDER"))
+                dr("ORA") = reader("ORA") 'CountString.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("NOX"))
+                If (Not ((IsDBNull(reader("O2_RIF"))) And reader("ORA") <> "Media Mensile")) Then
+                    Dim current_o2rif As Double
+                    If (Not (IsDBNull(reader("O2_RIF")))) Then
+                        current_o2rif = Convert.ToDouble(reader("O2_RIF"))
+                    Else
+                        current_o2rif = 0.0
+                    End If
 
-                If (reader("ORA") = "Media Mensile" Or current_o2rif <> O2RefDict(cteInvertedConfiguration)) Then
-                    dr("NOX_IC") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("NOX_IC"))
-                    dr("NOX_VLE") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("NOX_VLE"))
-                    dr("DISP_NOX") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("DISP_NOX"))
-                    dr("IS_BOLD_NOX") = reader("IS_BOLD_NOX")
-                    dr("CO_IC") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("CO_IC"))
-                    dr("CO_VLE") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("CO_VLE"))
-                    dr("DISP_CO") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("DISP_CO"))
-                    dr("IS_BOLD_CO") = reader("IS_BOLD_CO")
-                    dr("SO2_IC") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("SO2_IC"))
-                    dr("SO2_VLE") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("SO2_VLE"))
-                    dr("DISP_SO2") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("DISP_SO2"))
-                    dr("IS_BOLD_SO2") = reader("IS_BOLD_SO2")
-                    dr("POLVERI_IC") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("POLVERI_IC"))
-                    dr("POLVERI_VLE") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("POLVERI_VLE"))
-                    dr("DISP_POLVERI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("DISP_POLVERI"))
-                    dr("IS_BOLD_POLVERI") = reader("IS_BOLD_POLVERI")
-                    dr("O2_MIS") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("O2_MIS"))
-                    'dr("O2_RIF") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("O2_RIF"))
-                    dr("O2_RIF") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", O2RefDict(cteConfiguration))
-                    dr("TFUMI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("TFUMI"))
-                    dr("PFUMI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("PFUMI"))
-                    dr("ORE_NF") = reader("ORE_NF")
-                    dr("QFUMI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("QFUMI"))
-                    dr("UFUMI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("UFUMI"))
-                    dr("MWE") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("MWE"))
-                    dr("QGAS") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("QGAS"))
-                    dr("QFUELGAS") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("QFUELGAS"))
-                    dr("PORTATA_CO") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("PORTATA_CO"))
-                    dr("PORTATA_NOX") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("PORTATA_NOX"))
-                    dr("PORTATA_SO2") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("PORTATA_SO2"))
-                    dr("PORTATA_POLVERI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("PORTATA_POLVERI"))
-                    dr("COT_IC") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("COT_IC"))
-                    dr("COT_VLE") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("COT_VLE"))
-                    dr("DISP_COT") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("DISP_COT"))
-                    dr("PORTATA_COT") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("PORTATA_COT"))
+                    If (reader("ORA") = "Media Mensile" Or current_o2rif <> O2RefDict(cteInvertedConfiguration)) Then
+                        dr("NOX_IC") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("NOX_IC"))
+                        dr("NOX_VLE") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("NOX_VLE"))
+                        dr("DISP_NOX") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("DISP_NOX"))
+                        dr("IS_BOLD_NOX") = reader("IS_BOLD_NOX")
+                        dr("CO_IC") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("CO_IC"))
+                        dr("CO_VLE") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("CO_VLE"))
+                        dr("DISP_CO") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("DISP_CO"))
+                        dr("IS_BOLD_CO") = reader("IS_BOLD_CO")
+                        dr("SO2_IC") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("SO2_IC"))
+                        dr("SO2_VLE") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("SO2_VLE"))
+                        dr("DISP_SO2") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("DISP_SO2"))
+                        dr("IS_BOLD_SO2") = reader("IS_BOLD_SO2")
+                        dr("POLVERI_IC") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("POLVERI_IC"))
+                        dr("POLVERI_VLE") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("POLVERI_VLE"))
+                        dr("DISP_POLVERI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("DISP_POLVERI"))
+                        dr("IS_BOLD_POLVERI") = reader("IS_BOLD_POLVERI")
+                        dr("O2_MIS") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("O2_MIS"))
+                        dr("O2_RIF") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", O2RefDict(cteConfiguration))
+                        dr("TFUMI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("TFUMI"))
+                        dr("PFUMI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("PFUMI"))
+                        dr("ORE_NF") = reader("ORE_NF")
+                        dr("QFUMI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("QFUMI"))
+                        dr("UFUMI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("UFUMI"))
+                        dr("MWE") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("MWE"))
+                        dr("QGAS") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("QGAS"))
+                        dr("QFUELGAS") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("QFUELGAS"))
+                        dr("PORTATA_CO") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("PORTATA_CO"))
+                        dr("PORTATA_NOX") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("PORTATA_NOX"))
+                        dr("PORTATA_SO2") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("PORTATA_SO2"))
+                        dr("PORTATA_POLVERI") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("PORTATA_POLVERI"))
+                        dr("COT_IC") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("COT_IC"))
+                        dr("COT_VLE") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("COT_VLE"))
+                        dr("DISP_COT") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("DISP_COT"))
+                        dr("PORTATA_COT") = String.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("PORTATA_COT"))
 
-                    If (reader("ORA") = "Media Annuale") Then
-                        dr("SO2_VLE") = "N.A."
-                        dr("POLVERI_VLE") = "N.A."
-                        dr("NOX_VLE") = "N.A."
+                        If (reader("ORA") = "Media Annuale") Then
+                            dr("SO2_VLE") = "N.A."
+                            dr("POLVERI_VLE") = "N.A."
+                            dr("NOX_VLE") = "N.A."
+                        End If
                     End If
                 End If
-            End If
 
-            dt.Rows.Add(dr)
-            dr = dt.NewRow()
+                dt.Rows.Add(dr)
+                dr = dt.NewRow()
+
+            Catch ex As Exception
+                Logger.LogWarning("[" & methodName & "]" & " Errore nella lettura dei dati: ", ex)
+                Continue While
+            End Try
 
         End While
-        
+
+        queryNumber += 1
+        progress.Report(queryNumber * progressStep)
 
         Return dt
 
@@ -2975,15 +3025,17 @@ Public Class Form1
                     app = currentExcelCol + Convert.ToString(i + firstRow) + ":" + currentExcelCol + Convert.ToString(i + firstRow)
 
                     If Not ((section = 2) And (inquinante = "SO2")) Then
-                        Dim cellValue = Convert.ToInt16(dgv2.Rows(i).Cells(j).Value)
-                        wSheet.Range(app).Font.Bold = cellValue
-                        If cellValue = 1 Then
+
+                        If Convert.ToInt16(dgv2.Rows(i).Cells(j).Value.ToString()) = 1 Then
+                            wSheet.Range(app).Font.Bold = dgv2.Rows(i).Cells(j).Value.ToString()
                             wSheet.Range(app).Interior.Color = Color.Red
                             wSheet.Range(app).Font.Color = Color.White
                         Else
                             wSheet.Range(app).Interior.Color = Color.White
+                            wSheet.Range(app).Font.Bold = dgv2.Rows(i).Cells(j).Value.ToString()
                             wSheet.Range(app).Font.Color = Color.Black
                         End If
+
                     End If
                 End If
 
@@ -3186,17 +3238,17 @@ Public Class Form1
                     app = currentExcelCol + Convert.ToString(i + firstRow) + ":" + currentExcelCol + Convert.ToString(i + firstRow)
 
                     If Not ((section = 2) And (inquinante = "SO2")) Then
-                        Dim cellValue As Integer = Convert.ToInt16(dgv2.Rows(i).Cells(j).Value)
 
-                        If cellValue = 1 Then
-                            wSheet.Range(app).Font.Bold = True
+                        If Convert.ToInt16(dgv2.Rows(i).Cells(j).Value.ToString()) = 1 Then
+                            wSheet.Range(app).Font.Bold = dgv2.Rows(i).Cells(j).Value.ToString()
                             wSheet.Range(app).Interior.Color = Color.Red
                             wSheet.Range(app).Font.Color = Color.White
                         Else
                             wSheet.Range(app).Interior.Color = Color.White
-                            wSheet.Range(app).Font.Bold = False
+                            wSheet.Range(app).Font.Bold = dgv2.Rows(i).Cells(j).Value.ToString()
                             wSheet.Range(app).Font.Color = Color.Black
                         End If
+
                     End If
                 End If
 
@@ -3425,10 +3477,18 @@ Public Class Form1
                     If Convert.ToString(dgv2.Rows(i).Cells(j).Value) = "" Then
                         Exit For
                     Else
-                        ' Imposta il grassetto e il colore in base al valore
-                        wSheet.Range(app).Font.Bold = False
-                        wSheet.Range(app).Interior.Color = Color.White
-                        wSheet.Range(app).Font.Color = Color.Black
+
+                        If Convert.ToInt16(dgv2.Rows(i).Cells(j).Value.ToString()) = 1 Then
+                            wSheet.Range(app).Font.Bold = Convert.ToInt16(dgv2.Rows(i).Cells(j).Value.ToString())
+                            wSheet.Range(app).Interior.Color = Color.Red
+                            wSheet.Range(app).Font.Color = Color.White
+                        Else
+                            wSheet.Range(app).Font.Bold = Convert.ToInt16(dgv2.Rows(i).Cells(j).Value.ToString())
+                            wSheet.Range(app).Interior.Color = Color.White
+                            wSheet.Range(app).Font.Color = Color.Black
+
+                        End If
+
                     End If
                 End If
 
@@ -3607,6 +3667,14 @@ Public Class Form1
                     Else
                         app = "C" + Convert.ToString(i + 11) + ":C" + Convert.ToString(i + 11)
 
+                        If Convert.ToInt16(dgv2.Rows(i).Cells(j).Value.ToString()) = 1 Then
+
+                            wSheet.Range(app).Font.Bold = Convert.ToInt16(dgv2.Rows(i).Cells(j).Value.ToString())
+                            wSheet.Range(app).Interior.Color = Color.Red
+                            wSheet.Range(app).Font.Color = Color.White
+
+                        End If
+
                     End If
 
                     j = j + 1
@@ -3632,6 +3700,15 @@ Public Class Form1
                         wSheet.Cells(i + 11, col) = ""
                     Else
                         app = "F" + Convert.ToString(i + 11) + ":F" + Convert.ToString(i + 11)
+
+                        If Convert.ToInt16(dgv2.Rows(i).Cells(j).Value.ToString()) = 1 Then
+
+                            wSheet.Range(app).Font.Bold = Convert.ToInt16(dgv2.Rows(i).Cells(j).Value.ToString())
+                            wSheet.Range(app).Interior.Color = Color.Red
+                            wSheet.Range(app).Font.Color = Color.White
+
+                        End If
+
                     End If
                     j = j + 1
                     If dgv2.Rows(i).Cells(j).Value Is Nothing OrElse String.IsNullOrEmpty(dgv2.Rows(i).Cells(j).Value.ToString()) Then
@@ -3651,6 +3728,14 @@ Public Class Form1
                     Else
                         app = "I" + Convert.ToString(i + 11) + ":I" + Convert.ToString(i + 11)
 
+                        If Convert.ToInt16(dgv2.Rows(i).Cells(j).Value.ToString()) = 1 Then
+
+                            wSheet.Range(app).Font.Bold = Convert.ToInt16(dgv2.Rows(i).Cells(j).Value.ToString())
+                            wSheet.Range(app).Interior.Color = Color.Red
+                            wSheet.Range(app).Font.Color = Color.White
+
+                        End If
+
                     End If
                     j = j + 1
                     If dgv2.Rows(i).Cells(j).Value Is Nothing OrElse String.IsNullOrEmpty(dgv2.Rows(i).Cells(j).Value.ToString()) Then
@@ -3669,6 +3754,14 @@ Public Class Form1
                         wSheet.Cells(i + 11, col) = ""
                     Else
                         app = "L" + Convert.ToString(i + 11) + ":L" + Convert.ToString(i + 11)
+
+                        If Convert.ToInt16(dgv2.Rows(i).Cells(j).Value.ToString()) = 1 Then
+
+                            wSheet.Range(app).Font.Bold = Convert.ToInt16(dgv2.Rows(i).Cells(j).Value.ToString())
+                            wSheet.Range(app).Interior.Color = Color.Red
+                            wSheet.Range(app).Font.Color = Color.White
+
+                        End If
 
                     End If
                     j = j + 1
