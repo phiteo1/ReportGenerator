@@ -145,6 +145,4 @@ Public Class MySharedMethod
         Return ""
     End Function
 
-
-
 End Class

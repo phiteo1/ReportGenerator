@@ -124,7 +124,11 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="App_Code\MySharedMethod.vb" />
+    <Compile Include="Camino.vb" />
     <Compile Include="Class1.vb" />
+    <Compile Include="ImpiantoTaranto.vb" />
+    <Compile Include="ImpiantoBrindisi.vb" />
+    <Compile Include="IImpianto.vb" />
     <Compile Include="Logger.vb" />
     <Compile Include="Form1.vb">
       <SubType>Form</SubType>

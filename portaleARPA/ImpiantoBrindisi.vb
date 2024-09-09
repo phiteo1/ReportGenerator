@@ -1,4 +1,5 @@
-﻿Imports System.Threading
+﻿Imports System.Linq
+Imports System.Threading
 Imports System.Configuration
 Imports System.Globalization
 Imports System.IO
@@ -8,316 +9,51 @@ Imports System.Diagnostics
 Imports System.Reflection
 Imports System.ComponentModel
 
+Public Class ImpiantoBrindisi
+    Implements IImpianto
 
-Public Class Form1
-
-    'Dim connectionString As String
-    'Dim connectionStringCTE As String
-    'Dim culture As System.Globalization.CultureInfo
-    Public Shared startDate As Date
-    Public Shared endDate As Date
-    Public Shared reportType As Int32 = 255
-    Public Shared section As Int32 = 255S
-    'Dim ret As Int32
-    'Dim ret2 As Int32
-    Public Shared dgv As DataGridView
-    Public Shared dgv2 As DataGridView
-    'Dim datanh3 As String = ConfigurationManager.AppSettings("datanh3")
-    'Dim mesenh3 As Integer = ConfigurationManager.AppSettings("mesenh3")
-    'Dim hiddenColumns As New List(Of String)()
-    Public Shared aia As Int32 = 1
-    Public Shared isCte As Boolean = False
-    'Dim cteConfiguration As String = ""
-    'Dim cteInvertedConfiguration As String = ""
-    'Dim O2RefDict = Nothing
-    'Dim hnf, htran, vleCo, vleNox As String
-    'Enum State                  'State Machine of the downloading process
-    '    DataLoading = 1
-    '    TableLoading = 2
-    '    SheetLoading = 3
-    '    FinishedReport = 4
-    '    Finished = 5
-    'End Enum
-    Dim plant As String
-    Dim concretePlant As IImpianto
-    'Dim actualState As Byte
-
-    Private Sub Form1_Load(sender As Object, e As EventArgs) Handles MyBase.Load                                                                                        'Inizialitation of the database connection, form's item and of the grid view 
-
-        Logger.CreateLogDir()
-
-        'connectionString = ConfigurationManager.ConnectionStrings("AQMSDBCONN").ConnectionString
-        'connectionStringCTE = ConfigurationManager.ConnectionStrings("AQMSDBCONNCTE").ConnectionString
-
-        plant = ConfigurationManager.AppSettings("Impianto")
-        If plant.Contains("ImpiantoTaranto") Then
-            concretePlant = New ImpiantoTaranto()
-        ElseIf plant.Contains("ImpiantoBrindisi") Then
-            concretePlant = New ImpiantoBrindisi()
-        End If
-
-        Dim chimneyList As List(Of Camino) = concretePlant.getChimneyList()
-        For Each chimney In chimneyList
-            ComboBox1.Items.Add(chimney.getName)
-        Next
-
-        ComboBox3.Visible = False
-        Label6.Visible = False
-        ComboBox3.SelectedIndex = 0
-        ComboBox1.SelectedIndex = 0
-        ComboBox2.SelectedIndex = 0
-        ProgressBar1.Maximum = 100
-        TextBox1.Visible = False
-        DateTimePicker1.Value = Date.Now.AddYears(-1)
-        'culture = System.Globalization.CultureInfo.CreateSpecificCulture("en-US")
-        'culture.NumberFormat.NumberGroupSeparator = ""
-        TextBox1.Text = "Data Loading..."
-        SetDataGridView()
+    Private _chimneyList As New List(Of Camino)
 
 
-    End Sub
+    Public Sub New()
 
-    Private Sub Button1_BindingContextChanged(sender As Object, e As EventArgs) Handles Button1.BindingContextChanged
-
-    End Sub
-
-    Private Sub Button1_Click(sender As Object, e As EventArgs) Handles Button1.Click
-
-        Dim cteConfiguration As String = ""
-        Dim cteInvertedConfiguration As String = ""
-        Dim worker As New BackgroundWorker()
-        worker.WorkerReportsProgress = False
-        worker.WorkerSupportsCancellation = False
-        AddHandler worker.DoWork, AddressOf concretePlant.MainThread
-        'AddHandler worker.RunWorkerCompleted, AddressOf reportCompleted
-
-        reportType = ComboBox2.SelectedIndex
-        If (reportType = 0) Then
-            startDate = New DateTime(DateTimePicker1.Value.Year, 1, 1)
-            endDate = New DateTime(DateTimePicker2.Value.Year, 1, 1)
-        ElseIf (reportType = 1) Then
-            startDate = New DateTime(DateTimePicker1.Value.Year, DateTimePicker1.Value.Month, 1)
-            endDate = New DateTime(DateTimePicker2.Value.Year, DateTimePicker2.Value.Month, 1)
-        Else
-            Return
-        End If
-
-        If Not CheckBox1.Checked Then
-            aia = 0
-        End If
-
-        If ComboBox3.Visible Then
-            isCte = True
-            'Dim invertedIndex As Byte
-            'invertedIndex = If(ComboBox3.SelectedIndex = 0, 1, 0)
-            'cteConfiguration = LCase(ComboBox3.SelectedItem)
-            'cteInvertedConfiguration = LCase(ComboBox3.Items(invertedIndex).ToString())
-        End If
-
-        section = (concretePlant.getChimneyFromName(ComboBox1.SelectedItem)).getSection()
-        TextBox1.Visible = True
-        Controls.Add(dgv)
-        Controls.Add(dgv2)
-        dgv.Visible = True                                                                                                                                                 'Dont' worry about that. It's an hack to get the correct number of rows
-        dgv.Visible = False
-        dgv2.Visible = True
-        dgv2.Visible = False
-
-        DisableForm()
-
-        worker.RunWorkerAsync()
+        AddChimneyToList()
 
     End Sub
 
 
-    '    Private Sub mainThread()
+    Private Sub AddChimneyToList() Implements IImpianto.AddChimneyToList
 
-    '        Dim exePath As String = Application.StartupPath                                                                                                                     ' Get the 2 layer up directory
-    '        Dim grandParentPath As String = Directory.GetParent(Directory.GetParent(exePath).FullName).FullName
-    '        Dim chimneyName As String = MySharedMethod.GetChimneyName(Convert.ToInt16(section.ToString()))
-    '        Dim reportPath As String = Path.Combine(grandParentPath, "report", chimneyName)
-    '        Dim isCte As Byte = 0
+        _chimneyList.Add(New Camino("CC1", 1))
+        _chimneyList.Add(New Camino("CC2", 2))
+        _chimneyList.Add(New Camino("CC3", 3))
 
-    '        Dim startDate As Date
-    '        Dim endDate As Date
-
-    '        If (reportType = 0) Then
-    '            startDate = New DateTime(DateTimePicker1.Value.Year, 1, 1)
-    '            endDate = New DateTime(DateTimePicker2.Value.Year, 1, 1)
-    '        ElseIf (reportType = 1) Then
-    '            startDate = New DateTime(DateTimePicker1.Value.Year, DateTimePicker1.Value.Month, 1)
-    '            endDate = New DateTime(DateTimePicker2.Value.Year, DateTimePicker2.Value.Month, 1)
-    '        Else
-    '            Return
-    '        End If
-
-    '        UpdateProgressBarStatus(True)
-
-    '        UpdateTextBoxStatus(True)
+    End Sub
 
 
-    '        Dim barProgress As New Progress(Of Integer)(Sub(v)
-    '                                                        UpdateProgressBarValue(v)
-    '                                                    End Sub)                                                                                                                    'Refresh the GUI when a change in the progress bar occours
+    Public ReadOnly Property getChimenyList As List(Of Camino) Implements IImpianto.getChimneyList
+
+        Get
+
+            Return _chimneyList
+        End Get
+
+    End Property
+
+    Public Function getChimneyFromName(name As String) As Camino Implements IImpianto.getChimneyFromName
+
+        Dim chimney As Camino = _chimneyList.FirstOrDefault(Function(c) c.getName = name)
+
+        Return chimney
+
+    End Function
 
 
-    '        Dim StatusProgress As New Progress(Of Integer)(Sub(index)
-    '                                                           Select Case index
-    '                                                               Case 1
-    '                                                                   UpdateTextBoxText("Data Loading...")
-    '                                                                   actualState = State.DataLoading
-    '                                                               Case 2
-    '                                                                   UpdateTextBoxText("Table creation...")
-    '                                                                   UpdateProgressBarStatus(False)
-    '                                                                   actualState = State.TableLoading
-    '                                                               Case 3
-    '                                                                   UpdateTextBoxText("Sheet creation...")
-    '                                                                   actualState = State.SheetLoading
-    '                                                               Case 4
-    '                                                                   If (reportType = 0) Then
+    Public Sub mainThread() Implements IImpianto.mainThread
 
-    '                                                                       UpdateTextBoxText("Year " & startDate.Year.ToString & " downloaded succesfully")
+        Console.WriteLine(": " & Form1.startDate & Form1.endDate & Form1.section & Form1.reportType)
 
-    '                                                                   ElseIf (reportType = 1) Then
-
-    '                                                                       UpdateTextBoxText("Month " & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MMMM yyyy}", Date.Parse(startDate)) & " downloaded succesfully")
-
-    '                                                                   End If
-    '                                                                   actualState = State.FinishedReport
-    '                                                               Case 5
-    '                                                                   UpdateTextBoxText("Report generation finished!")
-    '                                                                   actualState = State.Finished
-    '                                                                   Button1.Text = "Generate Report"
-    '                                                                   EnableFormSafe(Me)
-    '                                                                   HideFormSafe(Me)
-    '                                                           End Select
-    '                                                       End Sub)                                                                                                                         'Refresh the GUI when a change in the state occours
-
-    '        Dim dataTable1 As DataTable = Nothing
-    '        Dim dataTable2 As DataTable = Nothing
-
-    '        If Not CheckBox1.Checked Then
-    '            aia = 0
-    '        End If
-
-    '        If ComboBox3.Visible Then
-    '            isCte = 1
-
-    '            If O2RefDict Is Nothing Then
-    '                O2RefDict = New Dictionary(Of String, Integer)
-    '                O2RefDict.Add("cogenerativo", 15)
-    '                O2RefDict.Add("caldaia", 3)
-    '            End If
-
-    '            Dim invertedIndex As Byte
-    '            invertedIndex = If(GetComboBoxSelectedIndex(ComboBox3) = 0, 1, 0)
-    '            cteConfiguration = LCase(GetComboBoxSelectedItem(ComboBox3))
-    '            cteInvertedConfiguration = LCase(ComboBox3.Items(invertedIndex).ToString())
-    '        End If
-
-    '        If isCte Then
-    '            reportPath = Path.Combine(grandParentPath, "report", "E3")
-    '        End If
-
-    '        If Not Directory.Exists(reportPath) Then
-    '            Try
-    '                Directory.CreateDirectory(reportPath)
-    '            Catch ex As Exception
-    '                MessageBox.Show("Errore nella creazione della directory.", "Avviso", MessageBoxButtons.OK, MessageBoxIcon.Warning)
-    '                EnableFormSafe(Me)
-    '                Return
-    '            End Try
-
-    '        End If
-
-    '        While (startDate <= endDate)
-    '            UpdateProgressBarValue(0)
-    '            If (Not ProgressBar1.Visible) Then
-    '                UpdateProgressBarStatus(True)
-    '            End If
-    '            If section = 8 Then
-    '                If bolla = 0 Then
-    '                    dataTable1 = GetDataFlussi(barProgress, startDate, endDate, section, reportType, 1)                                                                            'Get the data from the database and assign to first data table structure. The function is runned in an other trhead in order to allow the GUI to refresh properly
-    '                    dataTable2 = GetDataFlussi(barProgress, startDate, endDate, section, reportType, 2)                                                                           'Get the data from the database and assign to second data table structure
-    '                    preRenderFirstTable(section)
-    '                ElseIf bolla = 1 Then
-    '                    dataTable1 = GetFirstBollaTable(barProgress, startDate, endDate, section, reportType)                                                                          'Get the data from the database and assign to first data table structure. The function is runned in an other trhead in order to allow the GUI to refresh properly
-    '                    dataTable2 = GetSecondBollaTable(barProgress, startDate, endDate, section, reportType)                                                                        'Get the data from the database and assign to second data table structure
-    '                Else
-    '                    MessageBox.Show("Errore nella scelta della configurazione del camino.", "Avviso", MessageBoxButtons.OK, MessageBoxIcon.Warning)
-    '                    EnableFormSafe(Me)
-    '                    Return
-    '                End If
-
-    '            Else
-    '                If isCte = 0 Then
-    '                    dataTable1 = GetFirstCaminiTable(barProgress, startDate, endDate, section, reportType)
-    '                    dataTable2 = GetSecondCaminiTable(barProgress, startDate, endDate, section, reportType)
-    '                    preRenderFirstTable(section)
-    '                ElseIf isCte = 1 Then
-    '                    dataTable1 = GetFirstCTETable(barProgress, startDate, endDate, section, reportType)
-    '                    dataTable2 = GetSecondCTETable(barProgress, startDate, endDate, section, reportType)
-    '                Else
-    '                    MessageBox.Show("Errore nella scelta della configurazione del camino.", "Avviso", MessageBoxButtons.OK, MessageBoxIcon.Warning)
-    '                    EnableFormSafe(Me)
-    '                End If
-    '            End If
-
-    '            If dataTable1 Is Nothing Then
-    '                MessageBox.Show("Errore nell'acquisizione dei dati, consultare il file di log per i dettagli.", "Avviso", MessageBoxButtons.OK, MessageBoxIcon.Warning)
-    '                EnableFormSafe(Me)
-    '                Return
-    '            Else
-    '                UpdateDgvDataSource(dataTable1, dgv)                                                                                                                                    'Bind the data to the first DataGridView
-    '            End If
-
-    '            If dataTable2 Is Nothing Then
-    '                MessageBox.Show("Errore nell'acquisizione dei dati, consultare il file di log per i dettagli.", "Avviso", MessageBoxButtons.OK, MessageBoxIcon.Warning)
-    '                EnableFormSafe(Me)
-    '                Return
-    '            Else
-    '                UpdateDgvDataSource(dataTable2, dgv2)                                                                                                                                   'Bind the data to the second DataGridView
-    '            End If
-
-    '            If bolla = 0 Then
-    '                downloadReportFlussi(StatusProgress, startDate, endDate, reportPath)                                                                                                    'Download the reports of the selected years(months).
-
-    '            ElseIf bolla = 1 Then
-
-    '                downloadReportBolla(StatusProgress, startDate, endDate, reportPath)
-
-    '            Else
-
-
-    '                If reportType = 0 Then
-    '                    If (isCte = 0) Then
-    '                        downloadYearlyReportCamini(StatusProgress, startDate, endDate, reportPath)
-    '                    ElseIf (isCte = 1) Then
-    '                        downloadYearlyReportCTE(StatusProgress, startDate, endDate, reportPath)
-    '                    End If
-
-    '                ElseIf reportType = 1 Then
-
-    '                    If (isCte = 0) Then
-    '                        downloadMonthlyReportCamini(StatusProgress, startDate, endDate, reportPath)
-    '                    ElseIf (isCte = 1) Then
-    '                        downloadMonthlyReportCTE(StatusProgress, startDate, endDate, reportPath)
-    '                    End If
-
-    '                End If
-
-    '            End If
-
-    '            Dim deltaTime As String
-    '            If (reportType = 0) Then
-    '                deltaTime = "yyyy"                                                                                                                                                      'Add one year or one month according to the report type choosed
-    '            Else
-    '                deltaTime = "m"
-
-    '            End If
-    '            startDate = DateAdd(deltaTime, 1, startDate)
-    '        End While
-    '    End Sub
+    End Sub
     '    Private Function GetSection(camino As String) As Int32
 
     '        Select Case camino
@@ -1923,67 +1659,67 @@ Public Class Form1
 
     '    End Sub
 
-    Private Sub SetDataGridView()
+    '    Private Sub SetDataGridView()
 
-        dgv = New DataGridView()
-        dgv.Visible = False
-        dgv.Dock = DockStyle.Fill
-        dgv.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
-        dgv.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
-        dgv.AllowUserToAddRows = False
-        dgv.AllowUserToDeleteRows = False
-        dgv.AllowUserToResizeRows = False
-        dgv.RowHeadersVisible = False
-        dgv.Width = 1800
-        dgv.AutoGenerateColumns = True
-
-
-
-        For Each col As DataGridViewColumn In dgv.Columns
-            col.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter
-            col.DefaultCellStyle.Font = New Font(dgv.Font, FontStyle.Bold)
-        Next
-
-
-        dgv2 = New DataGridView()
-        dgv2.Visible = False
-        dgv2.Dock = DockStyle.Fill
-        dgv2.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
-        dgv2.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
-        dgv2.AllowUserToAddRows = False
-        dgv2.AllowUserToDeleteRows = False
-        dgv2.AllowUserToResizeRows = False
-        dgv2.RowHeadersVisible = False
-        dgv2.Width = 1800
-        dgv2.AutoGenerateColumns = True
+    '        dgv = New DataGridView()
+    '        dgv.Visible = False
+    '        dgv.Dock = DockStyle.Fill
+    '        dgv.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
+    '        dgv.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
+    '        dgv.AllowUserToAddRows = False
+    '        dgv.AllowUserToDeleteRows = False
+    '        dgv.AllowUserToResizeRows = False
+    '        dgv.RowHeadersVisible = False
+    '        dgv.Width = 1800
+    '        dgv.AutoGenerateColumns = True
 
 
 
-        For Each col As DataGridViewColumn In dgv2.Columns
-            col.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter
-            col.DefaultCellStyle.Font = New Font(dgv2.Font, FontStyle.Bold)
-        Next
-
-    End Sub
-
-    Private Sub ShowDataGridView(dataTable As DataTable)
-        ' Nascondi tutti i controlli del modulo eccetto la DataGridView
-        For Each ctrl As Control In Controls
-            If Not ctrl.Equals(dgv) Then
-                ctrl.Visible = False
-            End If
-        Next
-
-        ' Imposta la DataGridView come visibile e imposta i dati
-        dgv.DataSource = dataTable
+    '        For Each col As DataGridViewColumn In dgv.Columns
+    '            col.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter
+    '            col.DefaultCellStyle.Font = New Font(dgv.Font, FontStyle.Bold)
+    '        Next
 
 
-        Controls.Add(dgv)
-        dgv.Visible = True
-        ' Ridimensiona la DataGridView per occupare tutto lo spazio disponibile
-        dgv.Dock = DockStyle.Fill
+    '        dgv2 = New DataGridView()
+    '        dgv2.Visible = False
+    '        dgv2.Dock = DockStyle.Fill
+    '        dgv2.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
+    '        dgv2.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
+    '        dgv2.AllowUserToAddRows = False
+    '        dgv2.AllowUserToDeleteRows = False
+    '        dgv2.AllowUserToResizeRows = False
+    '        dgv2.RowHeadersVisible = False
+    '        dgv2.Width = 1800
+    '        dgv2.AutoGenerateColumns = True
 
-    End Sub
+
+
+    '        For Each col As DataGridViewColumn In dgv2.Columns
+    '            col.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter
+    '            col.DefaultCellStyle.Font = New Font(dgv2.Font, FontStyle.Bold)
+    '        Next
+
+    '    End Sub
+
+    '    Private Sub ShowDataGridView(dataTable As DataTable)
+    '     Nascondi tutti i controlli del modulo eccetto la DataGridView
+    '        For Each ctrl As Control In Controls
+    '            If Not ctrl.Equals(dgv) Then
+    '                ctrl.Visible = False
+    '            End If
+    '        Next
+
+    '     Imposta la DataGridView come visibile e imposta i dati
+    '        dgv.DataSource = dataTable
+
+
+    '        Controls.Add(dgv)
+    '        dgv.Visible = True
+    '     Ridimensiona la DataGridView per occupare tutto lo spazio disponibile
+    '        dgv.Dock = DockStyle.Fill
+
+    '    End Sub
 
     '    Private Sub downloadReportFlussi(ComboStatus As Progress(Of Integer), startDate As Date, endDate As Date, reportDir As String)
 
@@ -3906,22 +3642,22 @@ Public Class Form1
     '    End Sub
 
 
-    Private Sub DisableForm()
+    '    Private Sub DisableForm()
 
-        For Each ctrl As Control In Controls
-            If (Not ctrl.Equals(dgv) And (Not ctrl.Name = ProgressBar1.Name Or Not ctrl.Name = TextBox1.Name)) Then
-                ctrl.Enabled = False
-            End If
-        Next
+    '        For Each ctrl As Control In Controls
+    '            If (Not ctrl.Equals(dgv) And (Not ctrl.Name = ProgressBar1.Name Or Not ctrl.Name = TextBox1.Name)) Then
+    '                ctrl.Enabled = False
+    '            End If
+    '        Next
 
-    End Sub
+    '    End Sub
 
-    Private Sub ShowCompletionDialog()                                                                                  ' Crea un'istanza del form modale e la mostra in modalità                                       
+    '    Private Sub ShowCompletionDialog()                                                                                  ' Crea un'istanza del form modale e la mostra in modalità                                       
 
-        Dim completedDownloadForm As New Form2()
-        completedDownloadForm.ShowDialog()
+    '        Dim completedDownloadForm As New Form2()
+    '        completedDownloadForm.ShowDialog()
 
-    End Sub
+    '    End Sub
 
     '    Private Sub ResetForm()
 
@@ -4093,4 +3829,3 @@ Public Class Form1
     '    End Function
 
 End Class
-
