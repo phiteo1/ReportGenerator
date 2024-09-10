@@ -46,10 +46,9 @@ Partial Class Form1
             Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
         Me.Label1.AutoSize = True
         Me.Label1.Font = New System.Drawing.Font("Segoe UI", 24.0!, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
-        Me.Label1.Location = New System.Drawing.Point(276, 34)
-        Me.Label1.Margin = New System.Windows.Forms.Padding(4, 0, 4, 0)
+        Me.Label1.Location = New System.Drawing.Point(184, 22)
         Me.Label1.Name = "Label1"
-        Me.Label1.Size = New System.Drawing.Size(471, 65)
+        Me.Label1.Size = New System.Drawing.Size(316, 45)
         Me.Label1.TabIndex = 0
         Me.Label1.Text = "REPORT GENERATOR"
         Me.Label1.TextAlign = System.Drawing.ContentAlignment.MiddleCenter
@@ -59,20 +58,18 @@ Partial Class Form1
         Me.ComboBox1.Cursor = System.Windows.Forms.Cursors.Arrow
         Me.ComboBox1.Font = New System.Drawing.Font("Segoe UI", 8.25!, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
         Me.ComboBox1.FormattingEnabled = True
-        Me.ComboBox1.Location = New System.Drawing.Point(135, 308)
-        Me.ComboBox1.Margin = New System.Windows.Forms.Padding(4, 5, 4, 5)
+        Me.ComboBox1.Location = New System.Drawing.Point(90, 200)
         Me.ComboBox1.Name = "ComboBox1"
-        Me.ComboBox1.Size = New System.Drawing.Size(331, 31)
+        Me.ComboBox1.Size = New System.Drawing.Size(222, 21)
         Me.ComboBox1.TabIndex = 1
         '
         'Label2
         '
         Me.Label2.AutoSize = True
         Me.Label2.Font = New System.Drawing.Font("Segoe UI", 18.0!, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
-        Me.Label2.Location = New System.Drawing.Point(126, 212)
-        Me.Label2.Margin = New System.Windows.Forms.Padding(4, 0, 4, 0)
+        Me.Label2.Location = New System.Drawing.Point(84, 138)
         Me.Label2.Name = "Label2"
-        Me.Label2.Size = New System.Drawing.Size(149, 48)
+        Me.Label2.Size = New System.Drawing.Size(102, 32)
         Me.Label2.TabIndex = 2
         Me.Label2.Text = "Camino:"
         '
@@ -80,20 +77,18 @@ Partial Class Form1
         '
         Me.ComboBox2.FormattingEnabled = True
         Me.ComboBox2.Items.AddRange(New Object() {"Annuale", "Mensile"})
-        Me.ComboBox2.Location = New System.Drawing.Point(591, 308)
-        Me.ComboBox2.Margin = New System.Windows.Forms.Padding(4, 5, 4, 5)
+        Me.ComboBox2.Location = New System.Drawing.Point(394, 200)
         Me.ComboBox2.Name = "ComboBox2"
-        Me.ComboBox2.Size = New System.Drawing.Size(332, 28)
+        Me.ComboBox2.Size = New System.Drawing.Size(223, 21)
         Me.ComboBox2.TabIndex = 3
         '
         'Label3
         '
         Me.Label3.AutoSize = True
         Me.Label3.Font = New System.Drawing.Font("Segoe UI", 18.0!, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
-        Me.Label3.Location = New System.Drawing.Point(582, 212)
-        Me.Label3.Margin = New System.Windows.Forms.Padding(4, 0, 4, 0)
+        Me.Label3.Location = New System.Drawing.Point(388, 138)
         Me.Label3.Name = "Label3"
-        Me.Label3.Size = New System.Drawing.Size(203, 48)
+        Me.Label3.Size = New System.Drawing.Size(136, 32)
         Me.Label3.TabIndex = 4
         Me.Label3.Text = "Granularità:"
         '
@@ -101,10 +96,9 @@ Partial Class Form1
         '
         Me.Label4.AutoSize = True
         Me.Label4.Font = New System.Drawing.Font("Segoe UI", 18.0!, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
-        Me.Label4.Location = New System.Drawing.Point(126, 380)
-        Me.Label4.Margin = New System.Windows.Forms.Padding(4, 0, 4, 0)
+        Me.Label4.Location = New System.Drawing.Point(84, 247)
         Me.Label4.Name = "Label4"
-        Me.Label4.Size = New System.Drawing.Size(71, 48)
+        Me.Label4.Size = New System.Drawing.Size(49, 32)
         Me.Label4.TabIndex = 6
         Me.Label4.Text = "Da:"
         '
@@ -112,29 +106,26 @@ Partial Class Form1
         '
         Me.Label5.AutoSize = True
         Me.Label5.Font = New System.Drawing.Font("Segoe UI", 18.0!, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
-        Me.Label5.Location = New System.Drawing.Point(291, 380)
-        Me.Label5.Margin = New System.Windows.Forms.Padding(4, 0, 4, 0)
+        Me.Label5.Location = New System.Drawing.Point(194, 247)
         Me.Label5.Name = "Label5"
-        Me.Label5.Size = New System.Drawing.Size(51, 48)
+        Me.Label5.Size = New System.Drawing.Size(35, 32)
         Me.Label5.TabIndex = 8
         Me.Label5.Text = "A:"
         '
         'Button1
         '
-        Me.Button1.Location = New System.Drawing.Point(274, 640)
-        Me.Button1.Margin = New System.Windows.Forms.Padding(4, 5, 4, 5)
+        Me.Button1.Location = New System.Drawing.Point(183, 416)
         Me.Button1.Name = "Button1"
-        Me.Button1.Size = New System.Drawing.Size(453, 112)
+        Me.Button1.Size = New System.Drawing.Size(302, 73)
         Me.Button1.TabIndex = 9
         Me.Button1.Text = "Generate Report"
         Me.Button1.UseVisualStyleBackColor = True
         '
         'ProgressBar1
         '
-        Me.ProgressBar1.Location = New System.Drawing.Point(274, 762)
-        Me.ProgressBar1.Margin = New System.Windows.Forms.Padding(4, 5, 4, 5)
+        Me.ProgressBar1.Location = New System.Drawing.Point(183, 495)
         Me.ProgressBar1.Name = "ProgressBar1"
-        Me.ProgressBar1.Size = New System.Drawing.Size(453, 35)
+        Me.ProgressBar1.Size = New System.Drawing.Size(302, 23)
         Me.ProgressBar1.TabIndex = 12
         Me.ProgressBar1.Visible = False
         '
@@ -142,30 +133,27 @@ Partial Class Form1
         '
         Me.DateTimePicker1.CustomFormat = "yyyy"
         Me.DateTimePicker1.Format = System.Windows.Forms.DateTimePickerFormat.Custom
-        Me.DateTimePicker1.Location = New System.Drawing.Point(135, 462)
-        Me.DateTimePicker1.Margin = New System.Windows.Forms.Padding(4, 5, 4, 5)
+        Me.DateTimePicker1.Location = New System.Drawing.Point(90, 300)
         Me.DateTimePicker1.Name = "DateTimePicker1"
         Me.DateTimePicker1.ShowUpDown = True
-        Me.DateTimePicker1.Size = New System.Drawing.Size(154, 26)
+        Me.DateTimePicker1.Size = New System.Drawing.Size(104, 20)
         Me.DateTimePicker1.TabIndex = 13
         '
         'DateTimePicker2
         '
         Me.DateTimePicker2.CustomFormat = "yyyy"
         Me.DateTimePicker2.Format = System.Windows.Forms.DateTimePickerFormat.Custom
-        Me.DateTimePicker2.Location = New System.Drawing.Point(300, 462)
-        Me.DateTimePicker2.Margin = New System.Windows.Forms.Padding(4, 5, 4, 5)
+        Me.DateTimePicker2.Location = New System.Drawing.Point(200, 300)
         Me.DateTimePicker2.Name = "DateTimePicker2"
         Me.DateTimePicker2.ShowUpDown = True
-        Me.DateTimePicker2.Size = New System.Drawing.Size(166, 26)
+        Me.DateTimePicker2.Size = New System.Drawing.Size(112, 20)
         Me.DateTimePicker2.TabIndex = 14
         '
         'TextBox1
         '
-        Me.TextBox1.Location = New System.Drawing.Point(591, 462)
-        Me.TextBox1.Margin = New System.Windows.Forms.Padding(4, 5, 4, 5)
+        Me.TextBox1.Location = New System.Drawing.Point(394, 300)
         Me.TextBox1.Name = "TextBox1"
-        Me.TextBox1.Size = New System.Drawing.Size(332, 26)
+        Me.TextBox1.Size = New System.Drawing.Size(223, 20)
         Me.TextBox1.TabIndex = 15
         '
         'CheckBox1
@@ -174,10 +162,9 @@ Partial Class Form1
         Me.CheckBox1.Checked = True
         Me.CheckBox1.CheckState = System.Windows.Forms.CheckState.Checked
         Me.CheckBox1.Font = New System.Drawing.Font("Segoe UI", 9.0!, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
-        Me.CheckBox1.Location = New System.Drawing.Point(135, 518)
-        Me.CheckBox1.Margin = New System.Windows.Forms.Padding(4, 5, 4, 5)
+        Me.CheckBox1.Location = New System.Drawing.Point(90, 337)
         Me.CheckBox1.Name = "CheckBox1"
-        Me.CheckBox1.Size = New System.Drawing.Size(112, 29)
+        Me.CheckBox1.Size = New System.Drawing.Size(72, 19)
         Me.CheckBox1.TabIndex = 16
         Me.CheckBox1.Text = "AIA 2018"
         Me.CheckBox1.UseVisualStyleBackColor = True
@@ -186,28 +173,26 @@ Partial Class Form1
         '
         Me.ComboBox3.FormattingEnabled = True
         Me.ComboBox3.Items.AddRange(New Object() {"Cogenerativo", "Caldaia"})
-        Me.ComboBox3.Location = New System.Drawing.Point(220, 582)
-        Me.ComboBox3.Margin = New System.Windows.Forms.Padding(4, 5, 4, 5)
+        Me.ComboBox3.Location = New System.Drawing.Point(147, 378)
         Me.ComboBox3.Name = "ComboBox3"
-        Me.ComboBox3.Size = New System.Drawing.Size(180, 28)
+        Me.ComboBox3.Size = New System.Drawing.Size(121, 21)
         Me.ComboBox3.TabIndex = 17
         '
         'Label6
         '
         Me.Label6.AutoSize = True
         Me.Label6.Font = New System.Drawing.Font("Segoe UI", 9.75!, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
-        Me.Label6.Location = New System.Drawing.Point(130, 582)
-        Me.Label6.Margin = New System.Windows.Forms.Padding(4, 0, 4, 0)
+        Me.Label6.Location = New System.Drawing.Point(87, 378)
         Me.Label6.Name = "Label6"
-        Me.Label6.Size = New System.Drawing.Size(81, 28)
+        Me.Label6.Size = New System.Drawing.Size(54, 17)
         Me.Label6.TabIndex = 18
         Me.Label6.Text = "Assetto:"
         '
         'Form1
         '
-        Me.AutoScaleDimensions = New System.Drawing.SizeF(9.0!, 20.0!)
+        Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
-        Me.ClientSize = New System.Drawing.Size(1054, 815)
+        Me.ClientSize = New System.Drawing.Size(703, 530)
         Me.Controls.Add(Me.Label6)
         Me.Controls.Add(Me.ComboBox3)
         Me.Controls.Add(Me.CheckBox1)
@@ -223,7 +208,6 @@ Partial Class Form1
         Me.Controls.Add(Me.Label2)
         Me.Controls.Add(Me.ComboBox1)
         Me.Controls.Add(Me.Label1)
-        Me.Margin = New System.Windows.Forms.Padding(4, 5, 4, 5)
         Me.Name = "Form1"
         Me.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen
         Me.Text = "Report Generator"

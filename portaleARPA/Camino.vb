@@ -24,5 +24,10 @@
 
     End Function
 
+    Public Function getBolla() As Integer
+
+        Return _bolla
+
+    End Function
 
 End Class

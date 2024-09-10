@@ -22,11 +22,10 @@ Public Class Form1
     'Dim ret2 As Int32
     Public Shared dgv As DataGridView
     Public Shared dgv2 As DataGridView
-    'Dim datanh3 As String = ConfigurationManager.AppSettings("datanh3")
-    'Dim mesenh3 As Integer = ConfigurationManager.AppSettings("mesenh3")
     'Dim hiddenColumns As New List(Of String)()
     Public Shared aia As Int32 = 1
     Public Shared isCte As Boolean = False
+    Public Shared bolla As Byte
     'Dim cteConfiguration As String = ""
     'Dim cteInvertedConfiguration As String = ""
     'Dim O2RefDict = Nothing
@@ -40,6 +39,14 @@ Public Class Form1
     'End Enum
     Dim plant As String
     Dim concretePlant As IImpianto
+
+    Private Sub Form1_BackColorChanged(sender As Object, e As EventArgs) Handles Me.BackColorChanged
+
+    End Sub
+
+    Private Sub Form1_CursorChanged(sender As Object, e As EventArgs) Handles Me.CursorChanged
+
+    End Sub
     'Dim actualState As Byte
 
     Private Sub Form1_Load(sender As Object, e As EventArgs) Handles MyBase.Load                                                                                        'Inizialitation of the database connection, form's item and of the grid view 
@@ -61,6 +68,7 @@ Public Class Form1
             ComboBox1.Items.Add(chimney.getName)
         Next
 
+
         ComboBox3.Visible = False
         Label6.Visible = False
         ComboBox3.SelectedIndex = 0
@@ -69,8 +77,6 @@ Public Class Form1
         ProgressBar1.Maximum = 100
         TextBox1.Visible = False
         DateTimePicker1.Value = Date.Now.AddYears(-1)
-        'culture = System.Globalization.CultureInfo.CreateSpecificCulture("en-US")
-        'culture.NumberFormat.NumberGroupSeparator = ""
         TextBox1.Text = "Data Loading..."
         SetDataGridView()
 
@@ -89,7 +95,7 @@ Public Class Form1
         worker.WorkerReportsProgress = False
         worker.WorkerSupportsCancellation = False
         AddHandler worker.DoWork, AddressOf concretePlant.MainThread
-        'AddHandler worker.RunWorkerCompleted, AddressOf reportCompleted
+        AddHandler worker.RunWorkerCompleted, AddressOf reportCompleted
 
         reportType = ComboBox2.SelectedIndex
         If (reportType = 0) Then
@@ -115,6 +121,7 @@ Public Class Form1
         End If
 
         section = (concretePlant.getChimneyFromName(ComboBox1.SelectedItem)).getSection()
+        bolla = (concretePlant.getChimneyFromName(ComboBox1.SelectedItem)).getBolla()
         TextBox1.Visible = True
         Controls.Add(dgv)
         Controls.Add(dgv2)
@@ -1881,47 +1888,47 @@ Public Class Form1
 
 
 
-    '    Private Sub DateTimePicker1_ValueChanged(sender As Object, e As EventArgs) Handles DateTimePicker1.ValueChanged
+    Private Sub DateTimePicker1_ValueChanged(sender As Object, e As EventArgs) Handles DateTimePicker1.ValueChanged
 
-    '        Dim startDate = DateTimePicker1.Value
-    '        Dim endDate = DateTimePicker2.Value
+        Dim startDate = DateTimePicker1.Value
+        Dim endDate = DateTimePicker2.Value
 
-    '        If endDate.Date >= startDate.Date Then
-    '            Button1.Enabled = True
-    '        Else
-    '            Button1.Enabled = False
-    '        End If
+        If endDate.Date >= startDate.Date Then
+            Button1.Enabled = True
+        Else
+            Button1.Enabled = False
+        End If
 
-    '    End Sub
+    End Sub
 
-    '    Private Sub DateTimePicker2_ValueChanged(sender As Object, e As EventArgs) Handles DateTimePicker2.ValueChanged
+    Private Sub DateTimePicker2_ValueChanged(sender As Object, e As EventArgs) Handles DateTimePicker2.ValueChanged
 
-    '        Dim startDate = DateTimePicker1.Value
-    '        Dim endDate = DateTimePicker2.Value
+        Dim startDate = DateTimePicker1.Value
+        Dim endDate = DateTimePicker2.Value
 
-    '        If endDate.Date >= startDate.Date Then
-    '            Button1.Enabled = True
-    '        Else
-    '            Button1.Enabled = False
-    '        End If
+        If endDate.Date >= startDate.Date Then
+            Button1.Enabled = True
+        Else
+            Button1.Enabled = False
+        End If
 
-    '    End Sub
+    End Sub
 
-    '    Private Sub ComboBox2_SelectedIndexChanged(sender As Object, e As EventArgs) Handles ComboBox2.SelectedIndexChanged
+    Private Sub ComboBox2_SelectedIndexChanged(sender As Object, e As EventArgs) Handles ComboBox2.SelectedIndexChanged
 
-    '        Dim combobox As ComboBox = CType(sender, ComboBox)
+        Dim combobox As ComboBox = CType(sender, ComboBox)
 
-    '        If combobox.SelectedIndex = 1 Then
-    '            DateTimePicker1.CustomFormat = "MMMM yyyy"
-    '            DateTimePicker2.CustomFormat = "MMMM yyyy"
+        If combobox.SelectedIndex = 1 Then
+            DateTimePicker1.CustomFormat = "MMMM yyyy"
+            DateTimePicker2.CustomFormat = "MMMM yyyy"
 
-    '        ElseIf combobox.SelectedIndex = 0 Then
-    '            DateTimePicker1.CustomFormat = "yyyy"
-    '            DateTimePicker2.CustomFormat = "yyyy"
+        ElseIf combobox.SelectedIndex = 0 Then
+            DateTimePicker1.CustomFormat = "yyyy"
+            DateTimePicker2.CustomFormat = "yyyy"
 
-    '        End If
+        End If
 
-    '    End Sub
+    End Sub
 
     Private Sub SetDataGridView()
 
@@ -3937,17 +3944,17 @@ Public Class Form1
 
     '    End Sub
 
-    '    Private Sub ShowForm()
+    Private Sub ShowForm()
 
-    '        Me.Show()
+        Me.Show()
 
-    '        If Me.WindowState = FormWindowState.Minimized Then
-    '            Me.WindowState = FormWindowState.Normal
-    '        End If
+        If Me.WindowState = FormWindowState.Minimized Then
+            Me.WindowState = FormWindowState.Normal
+        End If
 
-    '        Me.Activate()
+        Me.Activate()
 
-    '    End Sub
+    End Sub
 
     '    Private Function GetCurrentMethod() As String
     '        Dim stackTrace As New StackTrace()
@@ -4056,25 +4063,26 @@ Public Class Form1
     '        End If
     '    End Sub
 
-    '    Private Sub reportCompleted(sender As Object, e As RunWorkerCompletedEventArgs)
-    '        ShowForm()
-    '    End Sub
+    Private Sub reportCompleted(sender As Object, e As RunWorkerCompletedEventArgs)
+        bolla = 254
+        ShowForm()
+    End Sub
 
-    '    Private Sub ComboBox1_SelectedIndexChanged(sender As Object, e As EventArgs) Handles ComboBox1.SelectedIndexChanged
+    Private Sub ComboBox1_SelectedIndexChanged(sender As Object, e As EventArgs) Handles ComboBox1.SelectedIndexChanged
 
-    '        Select Case ComboBox1.SelectedItem
-    '            Case "Camino E3"
-    '                ComboBox3.SelectedIndex = 0
-    '                Label6.Visible = True
-    '                ComboBox3.Visible = True
-    '            Case Else
-    '                If ComboBox3.Visible Then
-    '                    Label6.Visible = False
-    '                    ComboBox3.Visible = False
-    '                End If
-    '        End Select
+        Select Case ComboBox1.SelectedItem
+            Case "E3"
+                ComboBox3.SelectedIndex = 0
+                Label6.Visible = True
+                ComboBox3.Visible = True
+            Case Else
+                If ComboBox3.Visible Then
+                    Label6.Visible = False
+                    ComboBox3.Visible = False
+                End If
+        End Select
 
-    '    End Sub
+    End Sub
 
     '    Private Function GetComboBoxSelectedIndex(comboBox As ComboBox) As Integer
     '        If comboBox.InvokeRequired Then

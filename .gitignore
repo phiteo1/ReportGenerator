@@ -91,6 +91,7 @@ StyleCopReport.xml
 *.pidb
 *.svclog
 *.scc
+*.suo
 
 # Chutzpah Test files
 _Chutzpah*
@@ -385,7 +386,9 @@ InteropTests/NativeTests/out
 # 'git update-index --assume-unchanged <filename>' will allow ignoring changes for tracked files.
 **/ScratchProject/
 **/ScratchProjectWithInternals/
-/portaleARPA/logger
-/portaleARPA/report
-/portaleARPA/template
-*.suo
+/portaleARPA/logger/
+
+/portaleARPA/report/
+
+/portaleARPA/template/
+portaleARPA.v11.suo
