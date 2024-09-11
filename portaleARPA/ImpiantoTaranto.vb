@@ -3706,17 +3706,6 @@ Public Class ImpiantoTaranto
 
     End Sub
 
-
-    '    Private Sub DisableForm()
-
-    '        For Each ctrl As Control In Controls
-    '            If (Not ctrl.Equals(dgv) And (Not ctrl.Name = ProgressBar1.Name Or Not ctrl.Name = TextBox1.Name)) Then
-    '                ctrl.Enabled = False
-    '            End If
-    '        Next
-
-    '    End Sub
-
     Private Sub ShowCompletionDialog()                                                                                  ' Crea un'istanza del form modale e la mostra in modalità                                       
 
         Dim completedDownloadForm As New Form2()
@@ -3897,7 +3886,4 @@ Public Class ImpiantoTaranto
 
     End Sub
 
-    Protected Overrides Sub Finalize()
-        MyBase.Finalize()
-    End Sub
 End Class
