@@ -998,7 +998,8 @@ Public Class ImpiantoTaranto
             hiddenColumns.Add("PORTATA_NH3")
         End If
 
-
+        queryNumber += 1
+        progress.Report(queryNumber * progressStep)
         connection.Close()
 
         Return dt
@@ -1794,6 +1795,7 @@ Public Class ImpiantoTaranto
         Dim wBook As Microsoft.Office.Interop.Excel.Workbook
         Dim wSheet As Microsoft.Office.Interop.Excel.Worksheet
         Dim templatePath As String
+        Dim templateDir As String = ConfigurationManager.AppSettings("TemplateDirectory")
         Dim exePath As String = Application.StartupPath
         Dim rootPath As String = Directory.GetParent(Directory.GetParent(exePath).FullName).FullName
         Dim reportTitle As String = ""
@@ -1814,9 +1816,9 @@ Public Class ImpiantoTaranto
         'System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.CreateSpecificCulture("en-US")
 
         If (startDate >= d2) Then
-            templatePath = Path.Combine(rootPath, "template", "E9_152_MESE_MASS_CAMINI.xls")
+            templatePath = Path.Combine(rootPath, templateDir, "E9_152_MESE_MASS_CAMINI.xls")
         Else
-            templatePath = Path.Combine(rootPath, "template", "152_MESE_MASS_CAMINI.xls")
+            templatePath = Path.Combine(rootPath, templateDir, "152_MESE_MASS_CAMINI.xls")
 
         End If
         wBook = excel.Workbooks.Open(templatePath)
@@ -2468,15 +2470,16 @@ Public Class ImpiantoTaranto
         Dim wSheet As Microsoft.Office.Interop.Excel.Worksheet
         Dim exePath As String = Application.StartupPath
         Dim rootPath As String = Directory.GetParent(Directory.GetParent(exePath).FullName).FullName
+        Dim templateDir As String = ConfigurationManager.AppSettings("TemplateDirectory")
         Dim reportTitle As String = ""
         Dim d2 As Date = New Date(2020, 1, 1)
 
         If (startDate >= d2) Then
 
-            wBook = excel.Workbooks.Open(Path.Combine(rootPath, "template", "BAT_152_GIORNO_BOLLA_CAMINI.xls"))
+            wBook = excel.Workbooks.Open(Path.Combine(rootPath, templateDir, "BAT_152_GIORNO_BOLLA_CAMINI.xls"))
         Else
 
-            wBook = excel.Workbooks.Open(Path.Combine(rootPath, "template", "152_GIORNO_BOLLA_CAMINI.xls"))
+            wBook = excel.Workbooks.Open(Path.Combine(rootPath, templateDir, "152_GIORNO_BOLLA_CAMINI.xls"))
 
         End If
 
@@ -2741,6 +2744,7 @@ Public Class ImpiantoTaranto
         Dim wSheet As Microsoft.Office.Interop.Excel.Worksheet
         Dim exePath As String = Application.StartupPath
         Dim rootPath As String = Directory.GetParent(Directory.GetParent(exePath).FullName).FullName
+        Dim templateDir As String = ConfigurationManager.AppSettings("TemplateDirectory")
         Dim reportTitle As String = ""
         Dim d2 As Date = New Date(2020, mesenh3, 1)
 
@@ -2748,10 +2752,10 @@ Public Class ImpiantoTaranto
 
         If (startDate.Year >= d2.Year And Form1.section = 6) Then
 
-            wBook = excel.Workbooks.Open(Path.Combine(rootPath, "template", "E9_152_CONC_ANNO_TARANTO_RAFF_COV.xls"))
+            wBook = excel.Workbooks.Open(Path.Combine(rootPath, templateDir, "E9_152_CONC_ANNO_TARANTO_RAFF_COV.xls"))
         Else
 
-            wBook = excel.Workbooks.Open(Path.Combine(rootPath, "template", "152_CONC_ANNO_TARANTO_RAFF_COV.xls"))
+            wBook = excel.Workbooks.Open(Path.Combine(rootPath, templateDir, "152_CONC_ANNO_TARANTO_RAFF_COV.xls"))
 
         End If
 
@@ -2964,6 +2968,7 @@ Public Class ImpiantoTaranto
         Dim wSheet As Microsoft.Office.Interop.Excel.Worksheet
         Dim exePath As String = Application.StartupPath
         Dim rootPath As String = Directory.GetParent(Directory.GetParent(exePath).FullName).FullName
+        Dim templateDir As String = ConfigurationManager.AppSettings("TemplateDirectory")
         Dim reportTitle As String = ""
         Dim d2 As Date = New Date(2020, mesenh3, 1)
         Dim templateName As String = ""
@@ -2985,7 +2990,7 @@ Public Class ImpiantoTaranto
             templateName = "152_CONC_MESE_TARANTO_RAFF_COV.xls"
         End If
 
-        wBook = excel.Workbooks.Open(Path.Combine(rootPath, "template", templateName))
+        wBook = excel.Workbooks.Open(Path.Combine(rootPath, templateDir, templateName))
         wSheet = wBook.ActiveSheet()
 
         Dim percentuale As String
@@ -3181,6 +3186,7 @@ Public Class ImpiantoTaranto
         Dim wSheet As Microsoft.Office.Interop.Excel.Worksheet
         Dim exePath As String = Application.StartupPath
         Dim rootPath As String = Directory.GetParent(Directory.GetParent(exePath).FullName).FullName
+        Dim templateDir As String = ConfigurationManager.AppSettings("TemplateDirectory")
         Dim reportTitle As String = ""
         Dim cteConfigurationString As String
         Dim cteInvertedConfigurationString As String
@@ -3195,7 +3201,7 @@ Public Class ImpiantoTaranto
             cteInvertedConfigurationString = "Cogenerativo (O2 al 15%)"
         End If
 
-        wBook = excel.Workbooks.Open(Path.Combine(rootPath, "template", "152_CONC_ANNO_TARANTO.xls"))
+        wBook = excel.Workbooks.Open(Path.Combine(rootPath, templateDir, "152_CONC_ANNO_TARANTO.xls"))
         wSheet = wBook.ActiveSheet()
 
         Dim percentuale As String
@@ -3417,6 +3423,7 @@ Public Class ImpiantoTaranto
         Dim wSheet As Microsoft.Office.Interop.Excel.Worksheet
         Dim exePath As String = Application.StartupPath
         Dim rootPath As String = Directory.GetParent(Directory.GetParent(exePath).FullName).FullName
+        Dim templateDir As String = ConfigurationManager.AppSettings("TemplateDirectory")
         Dim reportTitle As String = ""
         Dim cteConfigurationString As String
         Dim cteInvertedConfigurationString As String
@@ -3431,7 +3438,7 @@ Public Class ImpiantoTaranto
             cteInvertedConfigurationString = "Cogenerativo (O2 al 15%)"
         End If
 
-        wBook = excel.Workbooks.Open(Path.Combine(rootPath, "template", "152_CONC_MESE_TARANTO.xls"))
+        wBook = excel.Workbooks.Open(Path.Combine(rootPath, templateDir, "152_CONC_MESE_TARANTO.xls"))
         wSheet = wBook.ActiveSheet()
 
         Dim percent As String = " "

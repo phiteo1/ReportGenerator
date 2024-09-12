@@ -87,6 +87,10 @@
     <Prefer32Bit>true</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="GemBox.Spreadsheet, Version=49.0.0.1822, Culture=neutral, PublicKeyToken=b1b72c69714d4847, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>C:\Program Files (x86)\GemBox Software\GemBox.Spreadsheet 4.9\Bin\net35\GemBox.Spreadsheet.dll</HintPath>
+    </Reference>
     <Reference Include="Interop.Microsoft.Office.Core">
       <HintPath>lib\Interop.Microsoft.Office.Core.dll</HintPath>
       <EmbedInteropTypes>False</EmbedInteropTypes>
