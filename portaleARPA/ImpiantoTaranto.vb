@@ -3327,11 +3327,11 @@ Public Class ImpiantoTaranto
                     Else
 
                         If Convert.ToInt16(Form1.dgv2.Rows(i).Cells(j).Value.ToString()) = 1 Then
-                            wSheet.Range(app).Font.Bold = Convert.ToInt16(Form1.dgv2.Rows(i).Cells(j).Value.ToString())
+                            wSheet.Range(app).Font.Bold = True
                             wSheet.Range(app).Interior.Color = Color.Red
                             wSheet.Range(app).Font.Color = Color.White
                         Else
-                            wSheet.Range(app).Font.Bold = Convert.ToInt16(Form1.dgv2.Rows(i).Cells(j).Value.ToString())
+                            wSheet.Range(app).Font.Bold = False
                             wSheet.Range(app).Interior.Color = Color.White
                             wSheet.Range(app).Font.Color = Color.Black
 
@@ -3516,7 +3516,7 @@ Public Class ImpiantoTaranto
 
                         If Convert.ToInt16(Form1.dgv2.Rows(i).Cells(j).Value.ToString()) = 1 Then
 
-                            wSheet.Range(app).Font.Bold = Convert.ToInt16(Form1.dgv2.Rows(i).Cells(j).Value.ToString())
+                            wSheet.Range(app).Font.Bold = True
                             wSheet.Range(app).Interior.Color = Color.Red
                             wSheet.Range(app).Font.Color = Color.White
 
@@ -3550,7 +3550,7 @@ Public Class ImpiantoTaranto
 
                         If Convert.ToInt16(Form1.dgv2.Rows(i).Cells(j).Value.ToString()) = 1 Then
 
-                            wSheet.Range(app).Font.Bold = Convert.ToInt16(Form1.dgv2.Rows(i).Cells(j).Value.ToString())
+                            wSheet.Range(app).Font.Bold = True
                             wSheet.Range(app).Interior.Color = Color.Red
                             wSheet.Range(app).Font.Color = Color.White
 
@@ -3577,7 +3577,7 @@ Public Class ImpiantoTaranto
 
                         If Convert.ToInt16(Form1.dgv2.Rows(i).Cells(j).Value.ToString()) = 1 Then
 
-                            wSheet.Range(app).Font.Bold = Convert.ToInt16(Form1.dgv2.Rows(i).Cells(j).Value.ToString())
+                            wSheet.Range(app).Font.Bold = True
                             wSheet.Range(app).Interior.Color = Color.Red
                             wSheet.Range(app).Font.Color = Color.White
 
@@ -3604,7 +3604,7 @@ Public Class ImpiantoTaranto
 
                         If Convert.ToInt16(Form1.dgv2.Rows(i).Cells(j).Value.ToString()) = 1 Then
 
-                            wSheet.Range(app).Font.Bold = Convert.ToInt16(Form1.dgv2.Rows(i).Cells(j).Value.ToString())
+                            wSheet.Range(app).Font.Bold = True
                             wSheet.Range(app).Interior.Color = Color.Red
                             wSheet.Range(app).Font.Color = Color.White
 
