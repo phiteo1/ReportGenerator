@@ -131,8 +131,11 @@ Public Class ImpiantoTaranto
                                                                    ElseIf (Form1.reportType = 1) Then
 
                                                                        UpdateTextBoxText(formInstance, formInstance.TextBox1, "Month " & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MMMM yyyy}", Date.Parse(startDate)) & " downloaded succesfully")
+                                                                   Else
+                                                                       UpdateTextBoxText(formInstance, formInstance.TextBox1, "Day " & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:dd MMMM yyyy}", Date.Parse(startDate)) & " downloaded succesfully")
 
                                                                    End If
+
                                                                    actualState = State.FinishedReport
                                                                Case 5
                                                                    UpdateTextBoxText(formInstance, formInstance.TextBox1, "Report generation finished!")
@@ -252,9 +255,12 @@ Public Class ImpiantoTaranto
             Dim deltaTime As String
             If (Form1.reportType = 0) Then
                 deltaTime = "yyyy"                                                                                                                                                      'Add one year or one month according to the report type choosed
-            Else
+            ElseIf (Form1.reportType = 1) Then
                 deltaTime = "m"
+            Else
+                deltaTime = "d"
             End If
+
             startDate = DateAdd(deltaTime, 1, startDate)
 
         End While
@@ -1809,7 +1815,9 @@ Public Class ImpiantoTaranto
                 d2 = New Date(2020, 1, 1)
             Case 1
                 d2 = New Date(2020, mesenh3, 1)
+                reportTitle = "152_MASSICO_MESE_" & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MMMM_yyyy}", Date.Parse(startDate))
             Case 2
+                reportTitle = "152_MASSICO_GIORNO_" & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:dd_MMMM_yyyy}", Date.Parse(startDate))
                 d2 = New Date(2020, mesenh3, 1)
         End Select
 
@@ -1831,7 +1839,7 @@ Public Class ImpiantoTaranto
         Dim tabspace As Integer
         cc = 11
 
-
+        Dim startDateFormatted As DateTime = DateTime.Parse(startDate).Date
 
         Select Case Form1.reportType
             Case 0
@@ -1845,11 +1853,13 @@ Public Class ImpiantoTaranto
                 End If
             Case 1
                 wSheet.Range("NomeTabella").Value = "152 MASSICO MENSILE CAMINI DI RAFFINERIA"
-                Dim startDateFormatted As DateTime = DateTime.Parse(startDate).Date
                 wSheet.Range("IntervalloDate").Value = "Report Mensile del Mese di " & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MMMM yyyy}", startDateFormatted)
-                reportTitle = "152_MASSICO_MESE_" & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MMMM_yyyy}", Date.Parse(startDate))
                 wSheet.Range("B8").Value = "Giorno"
                 wSheet.Range("NOTA_FRASE").Value = ""
+            Case 2
+                wSheet.Range("NomeTabella").Value = "152 CONCENTRAZIONI GIORNALIERO CAMINI DI RAFFINERIA"
+                wSheet.Range("IntervalloDate").Value = "Report Giornaliero di " + String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:dd/MM/yyyy}", startDateFormatted)
+                wSheet.Cells(2, 8).Value = "ORA"
         End Select
 
         wSheet.Range("NomeTabella").Font.Bold = True
@@ -2427,7 +2437,7 @@ Public Class ImpiantoTaranto
         Next
 
 
-
+        ComboStatus.Report(State.FinishedReport)
         Dim reportFileXls = reportTitle & ".xls"
         Dim reportFilePdf = reportTitle & ".pdf"
         Dim reportPath = Path.Combine(reportDir, reportFileXls)
@@ -2439,7 +2449,7 @@ Public Class ImpiantoTaranto
         wSheet.ExportAsFixedFormat(Microsoft.Office.Interop.Excel.XlFixedFormatType.xlTypePDF, reportPathPdf, Quality:=Microsoft.Office.Interop.Excel.XlFixedFormatQuality.xlQualityStandard, _
                     IncludeDocProperties:=True, IgnorePrintAreas:=False, _
                     OpenAfterPublish:=False)
-        ComboStatus.Report(State.FinishedReport)
+
         wBook.Close()
         excel.DisplayAlerts = True
         excel.Quit()
@@ -2487,19 +2497,28 @@ Public Class ImpiantoTaranto
 
         wSheet = wBook.ActiveSheet()
 
+        Dim startDateFormatted As DateTime = DateTime.Parse(startDate).Date
         Select Case Form1.reportType
             Case 0
                 wSheet.Range("NomeTabella").Value = "152 CONCENTRAZIONI ANNUALE CAMINI DI RAFFINERIA"
                 wSheet.Range("IntervalloDate").Value = "Report Annuale dell'anno " + String.Format(New CultureInfo("it-IT", False), "{0:yyyy}", DateTime.Parse(startDate, New CultureInfo("it-IT", False)))
                 wSheet.Cells(2, 8).Value = "MESE"
                 reportTitle = "152_BOLLA_ANNO_" & startDate.Year.ToString()
+
             Case 1
 
                 wSheet.Range("NomeTabella").Value = "152 CONCENTRAZIONI MENSILI CAMINI DI RAFFINERIA"
-                Dim startDateFormatted As DateTime = DateTime.Parse(startDate).Date
+
                 wSheet.Range("IntervalloDate").Value = "Report Mensile del Mese di " & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MMMM yyyy}", startDateFormatted)
                 wSheet.Cells(2, 8).Value = "GIORNO"
                 reportTitle = "152_BOLLA_MESE_" & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MMMM_yyyy}", Date.Parse(startDate))
+
+            Case 2
+                wSheet.Range("NomeTabella").Value = "152 CONCENTRAZIONI GIORNALIERO CAMINI DI RAFFINERIA"
+                wSheet.Range("IntervalloDate").Value = "Report Giornaliero di " + String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:dd/MM/yyyy}", startDateFormatted)
+                wSheet.Cells(2, 8).Value = "ORA"
+                reportTitle = "152_BOLLA_GIORNO" & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:dd_MMMM_yyyy}", Date.Parse(startDate))
+
         End Select
 
 

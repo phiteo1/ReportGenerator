@@ -77,7 +77,8 @@ Public Class Form1
             startDate = New DateTime(DateTimePicker1.Value.Year, DateTimePicker1.Value.Month, 1)
             endDate = New DateTime(DateTimePicker2.Value.Year, DateTimePicker2.Value.Month, 1)
         Else
-            Return
+            startDate = New DateTime(DateTimePicker1.Value.Year, DateTimePicker1.Value.Month, DateTimePicker1.Value.Day)
+            endDate = New DateTime(DateTimePicker2.Value.Year, DateTimePicker2.Value.Month, DateTimePicker2.Value.Day)
         End If
 
         If Not CheckBox1.Checked Then
@@ -142,7 +143,9 @@ Public Class Form1
         ElseIf combobox.SelectedIndex = 0 Then
             DateTimePicker1.CustomFormat = "yyyy"
             DateTimePicker2.CustomFormat = "yyyy"
-
+        Else
+            DateTimePicker1.CustomFormat = "dd MMMM yyyy"
+            DateTimePicker2.CustomFormat = "dd MMMM yyyy"
         End If
 
     End Sub

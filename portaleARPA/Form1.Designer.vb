@@ -58,7 +58,7 @@ Partial Class Form1
         Me.ComboBox1.Cursor = System.Windows.Forms.Cursors.Arrow
         Me.ComboBox1.Font = New System.Drawing.Font("Segoe UI", 8.25!, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
         Me.ComboBox1.FormattingEnabled = True
-        Me.ComboBox1.Location = New System.Drawing.Point(90, 200)
+        Me.ComboBox1.Location = New System.Drawing.Point(90, 188)
         Me.ComboBox1.Name = "ComboBox1"
         Me.ComboBox1.Size = New System.Drawing.Size(222, 21)
         Me.ComboBox1.TabIndex = 1
@@ -76,8 +76,8 @@ Partial Class Form1
         'ComboBox2
         '
         Me.ComboBox2.FormattingEnabled = True
-        Me.ComboBox2.Items.AddRange(New Object() {"Annuale", "Mensile"})
-        Me.ComboBox2.Location = New System.Drawing.Point(394, 200)
+        Me.ComboBox2.Items.AddRange(New Object() {"Annuale", "Mensile", "Giornaliero"})
+        Me.ComboBox2.Location = New System.Drawing.Point(394, 188)
         Me.ComboBox2.Name = "ComboBox2"
         Me.ComboBox2.Size = New System.Drawing.Size(223, 21)
         Me.ComboBox2.TabIndex = 3
@@ -96,25 +96,25 @@ Partial Class Form1
         '
         Me.Label4.AutoSize = True
         Me.Label4.Font = New System.Drawing.Font("Segoe UI", 18.0!, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
-        Me.Label4.Location = New System.Drawing.Point(84, 247)
+        Me.Label4.Location = New System.Drawing.Point(86, 226)
         Me.Label4.Name = "Label4"
-        Me.Label4.Size = New System.Drawing.Size(49, 32)
+        Me.Label4.Size = New System.Drawing.Size(55, 32)
         Me.Label4.TabIndex = 6
-        Me.Label4.Text = "Da:"
+        Me.Label4.Text = "Dal:"
         '
         'Label5
         '
         Me.Label5.AutoSize = True
         Me.Label5.Font = New System.Drawing.Font("Segoe UI", 18.0!, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
-        Me.Label5.Location = New System.Drawing.Point(194, 247)
+        Me.Label5.Location = New System.Drawing.Point(84, 300)
         Me.Label5.Name = "Label5"
-        Me.Label5.Size = New System.Drawing.Size(35, 32)
+        Me.Label5.Size = New System.Drawing.Size(41, 32)
         Me.Label5.TabIndex = 8
-        Me.Label5.Text = "A:"
+        Me.Label5.Text = "Al:"
         '
         'Button1
         '
-        Me.Button1.Location = New System.Drawing.Point(183, 416)
+        Me.Button1.Location = New System.Drawing.Point(183, 428)
         Me.Button1.Name = "Button1"
         Me.Button1.Size = New System.Drawing.Size(302, 73)
         Me.Button1.TabIndex = 9
@@ -123,7 +123,7 @@ Partial Class Form1
         '
         'ProgressBar1
         '
-        Me.ProgressBar1.Location = New System.Drawing.Point(183, 495)
+        Me.ProgressBar1.Location = New System.Drawing.Point(183, 507)
         Me.ProgressBar1.Name = "ProgressBar1"
         Me.ProgressBar1.Size = New System.Drawing.Size(302, 23)
         Me.ProgressBar1.TabIndex = 12
@@ -133,25 +133,25 @@ Partial Class Form1
         '
         Me.DateTimePicker1.CustomFormat = "yyyy"
         Me.DateTimePicker1.Format = System.Windows.Forms.DateTimePickerFormat.Custom
-        Me.DateTimePicker1.Location = New System.Drawing.Point(90, 300)
+        Me.DateTimePicker1.Location = New System.Drawing.Point(90, 270)
         Me.DateTimePicker1.Name = "DateTimePicker1"
         Me.DateTimePicker1.ShowUpDown = True
-        Me.DateTimePicker1.Size = New System.Drawing.Size(104, 20)
+        Me.DateTimePicker1.Size = New System.Drawing.Size(222, 20)
         Me.DateTimePicker1.TabIndex = 13
         '
         'DateTimePicker2
         '
         Me.DateTimePicker2.CustomFormat = "yyyy"
         Me.DateTimePicker2.Format = System.Windows.Forms.DateTimePickerFormat.Custom
-        Me.DateTimePicker2.Location = New System.Drawing.Point(200, 300)
+        Me.DateTimePicker2.Location = New System.Drawing.Point(90, 335)
         Me.DateTimePicker2.Name = "DateTimePicker2"
         Me.DateTimePicker2.ShowUpDown = True
-        Me.DateTimePicker2.Size = New System.Drawing.Size(112, 20)
+        Me.DateTimePicker2.Size = New System.Drawing.Size(222, 20)
         Me.DateTimePicker2.TabIndex = 14
         '
         'TextBox1
         '
-        Me.TextBox1.Location = New System.Drawing.Point(394, 300)
+        Me.TextBox1.Location = New System.Drawing.Point(394, 270)
         Me.TextBox1.Name = "TextBox1"
         Me.TextBox1.Size = New System.Drawing.Size(223, 20)
         Me.TextBox1.TabIndex = 15
@@ -162,7 +162,7 @@ Partial Class Form1
         Me.CheckBox1.Checked = True
         Me.CheckBox1.CheckState = System.Windows.Forms.CheckState.Checked
         Me.CheckBox1.Font = New System.Drawing.Font("Segoe UI", 9.0!, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
-        Me.CheckBox1.Location = New System.Drawing.Point(90, 337)
+        Me.CheckBox1.Location = New System.Drawing.Point(90, 367)
         Me.CheckBox1.Name = "CheckBox1"
         Me.CheckBox1.Size = New System.Drawing.Size(72, 19)
         Me.CheckBox1.TabIndex = 16
@@ -173,7 +173,7 @@ Partial Class Form1
         '
         Me.ComboBox3.FormattingEnabled = True
         Me.ComboBox3.Items.AddRange(New Object() {"Cogenerativo", "Caldaia"})
-        Me.ComboBox3.Location = New System.Drawing.Point(147, 378)
+        Me.ComboBox3.Location = New System.Drawing.Point(147, 392)
         Me.ComboBox3.Name = "ComboBox3"
         Me.ComboBox3.Size = New System.Drawing.Size(121, 21)
         Me.ComboBox3.TabIndex = 17
@@ -182,7 +182,7 @@ Partial Class Form1
         '
         Me.Label6.AutoSize = True
         Me.Label6.Font = New System.Drawing.Font("Segoe UI", 9.75!, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, CType(0, Byte))
-        Me.Label6.Location = New System.Drawing.Point(87, 378)
+        Me.Label6.Location = New System.Drawing.Point(87, 392)
         Me.Label6.Name = "Label6"
         Me.Label6.Size = New System.Drawing.Size(54, 17)
         Me.Label6.TabIndex = 18
@@ -192,7 +192,7 @@ Partial Class Form1
         '
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
-        Me.ClientSize = New System.Drawing.Size(703, 530)
+        Me.ClientSize = New System.Drawing.Size(703, 542)
         Me.Controls.Add(Me.Label6)
         Me.Controls.Add(Me.ComboBox3)
         Me.Controls.Add(Me.CheckBox1)
