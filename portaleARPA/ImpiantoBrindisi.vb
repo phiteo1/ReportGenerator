@@ -22,6 +22,8 @@ Public Class ImpiantoBrindisi
     Private culture As System.Globalization.CultureInfo
     Dim hnf, htran, vleCo, vleNox As String
     Dim colToJ As Dictionary(Of Integer, Integer)
+    Dim QAL2 As DataTable
+        
 
     Enum State                  'State Machine of the downloading process
         DataLoading = 1
@@ -39,6 +41,8 @@ Public Class ImpiantoBrindisi
         culture.NumberFormat.NumberGroupSeparator = ""
         connectionString = ConfigurationManager.ConnectionStrings("AQMSDBCONN").ConnectionString
         connectionStringCTE = ConfigurationManager.ConnectionStrings("AQMSDBCONNCTE").ConnectionString
+        QAL2 = New DataTable()
+
 
     End Sub
 
@@ -142,16 +146,23 @@ Public Class ImpiantoBrindisi
             End If
 
             dataTable1 = GetFirstCaminiTable(barProgress, startDate, endDate, Form1.section, Form1.reportType)
-            preRenderCaminiTable(dataTable1)
-            dataTable2 = GetSecondCaminiTable(barProgress, startDate, endDate, Form1.section, Form1.reportType)
-
             If dataTable1 Is Nothing Then
                 MessageBox.Show("Errore nell'acquisizione dei dati, consultare il file di log per i dettagli.", "Avviso", MessageBoxButtons.OK, MessageBoxIcon.Warning)
                 EnableFormSafe(formInstance)
                 Return
             Else
+                preRenderCaminiTable(dataTable1)
                 UpdateDgvDataSource(dataTable1, Form1.dgv)
             End If
+
+            If Form1.reportType = 2 Then
+                dataTable2 = GetDailySecondCaminiTable(barProgress, startDate, endDate, Form1.section, Form1.reportType)
+            Else
+                dataTable2 = GetSecondCaminiTable(barProgress, startDate, endDate, Form1.section, Form1.reportType)
+            End If
+
+
+            
 
             If dataTable2 Is Nothing Then
                 MessageBox.Show("Errore nell'acquisizione dei dati, consultare il file di log per i dettagli.", "Avviso", MessageBoxButtons.OK, MessageBoxIcon.Warning)
@@ -174,6 +185,10 @@ Public Class ImpiantoBrindisi
                 downloadMonthlyReportCamini(StatusProgress, startDate, endDate, reportPath)
 
                 '    downloadMonthlyReportCTE(StatusProgress, startDate, endDate, reportPath)
+            Else
+
+                downloadDailyReportCamini(StatusProgress, startDate, endDate, reportPath)
+
 
             End If
 
@@ -181,9 +196,12 @@ Public Class ImpiantoBrindisi
             Dim deltaTime As String
             If (Form1.reportType = 0) Then
                 deltaTime = "yyyy"                                                                                                                                                      'Add one year or one month according to the report type choosed
-            Else
+            ElseIf (Form1.reportType = 1) Then
                 deltaTime = "m"
+            Else
+                deltaTime = "d"
             End If
+
             startDate = DateAdd(deltaTime, 1, startDate)
 
         End While
@@ -209,6 +227,8 @@ Public Class ImpiantoBrindisi
             type = 3
         ElseIf Form1.reportType = 1 Then
             type = 2
+        Else
+            type = 1
         End If
 
         Try
@@ -221,7 +241,13 @@ Public Class ImpiantoBrindisi
             Return dt
         End Try
 
+        
+        Dim q2Result = FillQAL2()
 
+        If q2Result = 0 Then
+            dt = Nothing
+            Return dt
+        End If
 
         dt.Columns.Add(New Data.DataColumn("INTESTAZIONE", GetType(String)))
         dt.Columns.Add(New Data.DataColumn("CO", GetType(String)))
@@ -483,6 +509,188 @@ Public Class ImpiantoBrindisi
 
     End Function
 
+    Private Function GetDailySecondCaminiTable(progress As Progress(Of Integer), startTime As DateTime, endTime As DateTime, section As Int32, ByVal type As Int32) As Data.DataTable
+
+        Dim dt As New Data.DataTable()
+        Dim command As System.Data.SqlClient.SqlCommand
+        Dim reader As System.Data.SqlClient.SqlDataReader
+        Dim connection As New SqlConnection(connectionString)
+        Dim queryNumber As Integer = 3
+        Dim queriesCount As Integer = 4
+        Dim progressStep As Integer = 100 \ queriesCount
+        Dim methodName As String = GetCurrentMethod()
+        Dim dataType As String = " ORDER BY INS_ORDER"
+        Dim ret As Integer
+        
+
+        Try
+            ' Tenta di aprire la connessione
+            connection.Open()
+        Catch ex As Exception
+            ' Gestione degli errori
+            MessageBox.Show("Errore durante la connessione al database: " & ex.Message, "Errore", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            dt = Nothing
+            Return dt
+        End Try
+
+
+
+        dt.Columns.Add(New Data.DataColumn("IDX_REPORT", GetType(Double)))
+        dt.Columns.Add(New Data.DataColumn("INS_ORDER", GetType(Integer)))
+        dt.Columns.Add(New Data.DataColumn("ORA", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("NOX_IC", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("NOX_TQ", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("NOX_COD", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("DISP_NOX", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("IS_BOLD_NOX", GetType(Integer)))
+        dt.Columns.Add(New Data.DataColumn("CO_IC", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("CO_TQ", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("CO_COD", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("DISP_CO", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("IS_BOLD_CO", GetType(Integer)))
+        dt.Columns.Add(New Data.DataColumn("O2_MIS", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("O2_RIF", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("O2_COD", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("DISP_O2", GetType(String))) 'NUOVO
+        dt.Columns.Add(New Data.DataColumn("TFUMI", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("TFUMI_COD", GetType(String)))   'NUOVO
+        dt.Columns.Add(New Data.DataColumn("DISP_TFUMI", GetType(String)))  'NUOVO
+        dt.Columns.Add(New Data.DataColumn("PFUMI", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("PFUMI_COD", GetType(String)))   'NUOVO
+        dt.Columns.Add(New Data.DataColumn("DISP_PFUMI", GetType(String)))  'NUOVO
+        dt.Columns.Add(New Data.DataColumn("STATO_IMP", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("QFUMI", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("QFUMI_COD", GetType(String)))   'NUOVO
+        dt.Columns.Add(New Data.DataColumn("DISP_QFUMI", GetType(String)))  'NUOVO
+        dt.Columns.Add(New Data.DataColumn("UFUMI", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("UFUMI_COD", GetType(String)))   'NUOVO
+        dt.Columns.Add(New Data.DataColumn("DISP_UFUMI", GetType(String)))  'NUOVO
+        dt.Columns.Add(New Data.DataColumn("MWE", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("QGAS", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("QFUELGAS", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("PORTATA_CO", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("PORTATA_NOX", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("MULETTO_CO", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("MULETTO_NO", GetType(String)))
+        dt.Columns.Add(New Data.DataColumn("MULETTO_O2", GetType(String)))
+
+
+        Dim testCMD As Data.SqlClient.SqlCommand = New Data.SqlClient.SqlCommand("sp_AQMSNT_FILL_ARPA_REALTIME", connection)
+        testCMD.CommandType = Data.CommandType.StoredProcedure
+        testCMD.Parameters.Add("@idsez", Data.SqlDbType.Int, 11)
+        testCMD.Parameters("@idsez").Direction = Data.ParameterDirection.Input
+        testCMD.Parameters("@idsez").Value = Form1.section
+
+        testCMD.Parameters.Add("@data", Data.SqlDbType.DateTime, 11)
+        testCMD.Parameters("@data").Direction = Data.ParameterDirection.Input
+        testCMD.Parameters("@data").Value = Format("{0:dd/MM/yyyy}", startTime.ToString()) 'RepggCal.SelectedDate.ToString("dd/MM/yyyy HH:mm:ss")
+
+        testCMD.Parameters.Add("@retval", Data.SqlDbType.Int)
+        testCMD.Parameters("@retval").Direction = Data.ParameterDirection.Output
+        testCMD.Parameters.Add("@percval_co", Data.SqlDbType.Int)
+        testCMD.Parameters("@percval_co").Direction = Data.ParameterDirection.Output
+        testCMD.Parameters.Add("@percval_nox", Data.SqlDbType.Int)
+        testCMD.Parameters("@percval_nox").Direction = Data.ParameterDirection.Output
+        testCMD.Parameters.Add("@totvlehhco", Data.SqlDbType.Int)
+        testCMD.Parameters("@totvlehhco").Direction = Data.ParameterDirection.Output
+        testCMD.Parameters.Add("@totvlehhnox", Data.SqlDbType.Int)
+        testCMD.Parameters("@totvlehhnox").Direction = Data.ParameterDirection.Output
+        testCMD.Parameters.Add("@totvleggco", Data.SqlDbType.Int)
+        testCMD.Parameters("@totvleggco").Direction = Data.ParameterDirection.Output
+        testCMD.Parameters.Add("@totvleggnox", Data.SqlDbType.Int)
+        testCMD.Parameters("@totvleggnox").Direction = Data.ParameterDirection.Output
+
+        Try
+            testCMD.ExecuteScalar()
+        Catch ex As Exception
+            Logger.LogError("[" & methodName & "]" & " Errore durante l'esecuzione della stored procedure: ", ex)
+            dt = Nothing
+            Return dt
+        End Try
+
+
+        vleCo = testCMD.Parameters("@percval_co").Value
+        vleNox = testCMD.Parameters("@percval_nox").Value
+        ret = testCMD.Parameters("@retval").Value
+
+        Dim log_statement As String = "SELECT * FROM [ARPA_WEB_REAL_TIME] WHERE IDX_REPORT = " & ret.ToString() & dataType
+        command = New System.Data.SqlClient.SqlCommand(log_statement, connection)
+
+        Try
+            reader = command.ExecuteReader()
+        Catch ex As SqlException
+            Logger.LogError("[" & methodName & "]" & " Errore durante l'esecuzione della query: ", ex)
+            dt = Nothing
+            Return dt
+        End Try
+
+        Dim dr As Data.DataRow = dt.NewRow()
+
+        While reader.Read()
+            Try
+                dr("IDX_REPORT") = reader("IDX_REPORT")
+                dr("INS_ORDER") = String.Format("{0:n0}", reader("INS_ORDER"))
+                dr("ORA") = reader("ORA") 'String.Format("{0:n2}", reader("NOX"))
+                dr("NOX_IC") = String.Format("{0:n2}", reader("NOX_IC"))
+                dr("NOX_TQ") = String.Format("{0:n2}", reader("NOX_TQ"))
+                dr("NOX_COD") = String.Format("{0:n2}", reader("NOX_COD"))
+                dr("DISP_NOX") = String.Format("{0:n2}", reader("DISP_NOX"))
+                dr("IS_BOLD_NOX") = reader("IS_BOLD_NOX")
+                dr("CO_IC") = String.Format("{0:n2}", reader("CO_IC"))
+                dr("CO_TQ") = String.Format("{0:n2}", reader("CO_TQ"))
+                dr("CO_COD") = String.Format("{0:n2}", reader("CO_COD"))
+                dr("DISP_CO") = String.Format("{0:n2}", reader("DISP_CO"))
+                dr("IS_BOLD_CO") = reader("IS_BOLD_CO")
+                dr("O2_MIS") = String.Format("{0:n2}", reader("O2_MIS"))
+                dr("O2_RIF") = String.Format("{0:n2}", reader("O2_RIF"))
+                dr("O2_COD") = String.Format("{0:n2}", reader("O2_COD"))
+                dr("DISP_O2") = String.Format("{0:n2}", reader("DISP_O2")) 'NUOVO
+                dr("TFUMI") = String.Format("{0:n2}", reader("TFUMI"))
+                dr("TFUMI_COD") = String.Format("{0:n2}", reader("TFUMI_COD")) 'NUOVO
+                dr("DISP_TFUMI") = String.Format("{0:n2}", reader("DISP_TFUMI")) 'NUOVO
+                dr("PFUMI") = String.Format("{0:n2}", reader("PFUMI"))
+                dr("PFUMI_COD") = String.Format("{0:n2}", reader("PFUMI_COD")) 'NUOVO
+                dr("DISP_PFUMI") = String.Format("{0:n2}", reader("DISP_PFUMI")) 'NUOVO
+                dr("STATO_IMP") = String.Format("{0:n2}", reader("STATO_IMP"))
+                dr("QFUMI") = String.Format("{0:n2}", reader("QFUMI"))
+                dr("QFUMI_COD") = String.Format("{0:n2}", reader("QFUMI_COD")) 'NUOVO
+                dr("DISP_QFUMI") = String.Format("{0:n2}", reader("DISP_QFUMI")) 'NUOVO
+                dr("UFUMI") = String.Format("{0:n2}", reader("UFUMI"))
+                dr("UFUMI_COD") = String.Format("{0:n2}", reader("UFUMI_COD")) 'NUOVO
+                dr("DISP_UFUMI") = String.Format("{0:n2}", reader("DISP_UFUMI")) 'NUOVO
+                dr("MWE") = String.Format("{0:n2}", reader("MWE"))
+
+                dr("QGAS") = String.Format("{0:n2}", reader("QGAS"))
+
+                dr("QFUELGAS") = String.Format("{0:n2}", reader("QFUELGAS"))
+
+                dr("PORTATA_CO") = String.Format("{0:n2}", reader("PORTATA_CO"))
+
+                dr("PORTATA_NOX") = String.Format("{0:n2}", reader("PORTATA_NOX"))
+                dr("MULETTO_CO") = String.Format("{0:n2}", reader("MULETTO_CO"))
+                dr("MULETTO_NO") = String.Format("{0:n2}", reader("MULETTO_NO"))
+                dr("MULETTO_O2") = String.Format("{0:n2}", reader("MULETTO_O2"))
+
+                dt.Rows.Add(dr)
+                dr = dt.NewRow()
+            Catch ex As Exception
+                Logger.LogWarning("[" & methodName & "]" & " Errore nella lettura dei dati: ", ex)
+                Continue While
+            End Try
+
+        End While
+
+        queryNumber += 1
+        progress.Report(queryNumber * progressStep)
+
+        Return dt
+
+    End Function
+
+
+
+
+
     Private Sub downloadYearlyReportCamini(ComboStatus As Progress(Of Integer), startDate As Date, endDate As Date, reportDir As String)
 
         Dim exePath As String = Application.StartupPath
@@ -507,7 +715,7 @@ Public Class ImpiantoBrindisi
         SetRangeBorderStyle(wSheetGemBox.Cells.GetSubrange("G5:R5"))
         SetRangeValueAndStyle(wSheetGemBox.NamedRanges.Item("HNF").Range, hnf, True) 'Numero ore di normale funzionamento di impianto 
         SetRangeValueAndStyle(wSheetGemBox.NamedRanges.Item("HTRANS").Range, htran, True)  'Numero ore di transitorio di impianto
-        reportTitle = "152_CONC_ANNO_" & startDate.Year
+        reportTitle = "152_CONC_ANNO_" & Form1.section.ToString() & "_" & startDate.Year
 
 
 
@@ -712,7 +920,7 @@ Public Class ImpiantoBrindisi
         SetRangeBorderStyle(wSheetGemBox.Cells.GetSubrange("G5:R5"))
         SetRangeValueAndStyle(wSheetGemBox.NamedRanges.Item("HNF").Range, hnf, True)
         SetRangeValueAndStyle(wSheetGemBox.NamedRanges.Item("HTRANS").Range, htran, True)
-        reportTitle = "152_CONC_MESECC_" & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MMMM_yyyy}", Date.Parse(startDate))
+        reportTitle = "152_CONC_MESECC_" & Form1.section.ToString() & "_" & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MMMM_yyyy}", Date.Parse(startDate))
 
         Dim i As Integer
         Dim j As Integer
@@ -884,6 +1092,229 @@ Public Class ImpiantoBrindisi
 
     End Sub
 
+    Private Sub downloadDailyReportCamini(ComboStatus As Progress(Of Integer), startDate As Date, endDate As Date, reportDir As String)
+
+        Dim exePath As String = Application.StartupPath
+        Dim rootPath As String = Directory.GetParent(Directory.GetParent(exePath).FullName).FullName
+        Dim templateDir As String = ConfigurationManager.AppSettings("TemplateDirectory")
+        Dim reportTitle As String = ""
+        Dim methodName As String = GetCurrentMethod()
+        System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.CreateSpecificCulture("en-US")
+        SpreadsheetInfo.SetLicense("FREE-LIMITED-KEY")
+        Dim wBookGemBox As ExcelFile = ExcelFile.Load(Path.Combine(rootPath, templateDir, "152_CONC_GIORNOTG.xls")) 'Viene caricato il template Excel dal percorso specificato.
+        Dim wSheetGemBox As ExcelWorksheet = wBookGemBox.Worksheets(0) 'Viene ottenuto il riferimento al primo foglio di lavoro del file Excel caricato.
+
+        ComboStatus.Report(State.TableLoading)
+
+        Dim first_row As Integer = 10
+        Dim first_col As Integer = 1
+
+        'test: Dim GV_DAILYREP_ROWS_COUNT = 10
+
+
+        ' Set values and styles for named ranges
+        SetRangeValueAndStyle(wSheetGemBox.Cells.GetSubrange("F1"), "152_CONC_GIORNO", True)
+        SetRangeValueAndStyle(wSheetGemBox.Cells.GetSubrange("F2"), "ENIPOWER - Centrale di Brindisi - Sezione Termoelettrica n� " & Form1.section.ToString(), True)
+        SetRangeValueAndStyle(wSheetGemBox.Cells.GetSubrange("F3"), "Sistema di Misura delle Emissioni", True)
+        SetRangeValueAndStyle(wSheetGemBox.Cells.GetSubrange("F4"), "Report Giornaliero concentrazioni medie orarie e giornaliera (Nox,Co) - Dlgs 152 (70%)", True)
+        Dim startDateFormatted As DateTime = DateTime.Parse(startDate).Date
+        SetRangeValueAndStyle(wSheetGemBox.Cells.GetSubrange("F5"), "Report Giornaliero del " & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:dd/MMMM/yyyy}", startDateFormatted), True)
+        SetRangeBorderStyle(wSheetGemBox.Cells.GetSubrange("F1:P5"))
+        SetRangeValueAndStyle(wSheetGemBox.NamedRanges.Item("HNF").Range, hnf, True)
+        SetRangeValueAndStyle(wSheetGemBox.NamedRanges.Item("HTRANS").Range, htran, True)
+        reportTitle = "152_CONC_GIORNOCC_" & Form1.section.ToString() & "_" & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:dd_MMMM_yyyy}", Date.Parse(startDate))
+        Dim GV_DAILYREP_ROWS_COUNT = Form1.dgv2.Rows.Count
+
+        Dim howmanyrows = If(GV_DAILYREP_ROWS_COUNT - 2 >= 0, GV_DAILYREP_ROWS_COUNT - 2, 0)
+
+        wSheetGemBox.Rows.InsertCopy(first_row, howmanyrows, wSheetGemBox.Rows(first_row))
+
+        ComboStatus.Report(State.SheetLoading)
+
+        Dim row_offset As Integer = 0
+        Dim EMPTY_STRING As String = "&nbsp;"
+
+        ' warning: for loops in vbnet are inclusive that's why we have to subtract 2 from the column number
+        For row_offset = 0 To (GV_DAILYREP_ROWS_COUNT - 1)
+
+            For this_col = first_col To GetColumnNumber("AI")  ' Loop through columns B to AI 
+                Dim current_cell = wSheetGemBox.Cells(first_row + row_offset, this_col)
+                current_cell.Style.Borders.SetBorders(MultipleBorders.Outside, SpreadsheetColor.FromName(ColorName.Black), LineStyle.Thin)
+                current_cell.Style.HorizontalAlignment = HorizontalAlignmentStyle.Center
+                current_cell.Style.VerticalAlignment = VerticalAlignmentStyle.Center
+            Next
+
+            Dim grid_offset = 2
+            Dim col_offset = 1
+            Dim gd_col = 0
+            Dim gv_col = 0
+            Dim skipped_cols = 0
+
+
+            While gd_col < Form1.dgv2.Rows(row_offset).Cells.Count - 1
+                Dim current_cell_col = gv_col + col_offset - skipped_cols
+                Dim current_cell_row = first_row + row_offset
+                gd_col = gv_col + grid_offset
+                Dim current_cell = wSheetGemBox.Cells(current_cell_row, current_cell_col)
+                Dim current_data = Form1.dgv2.Rows(row_offset).Cells(gd_col).Value.ToString()
+                System.Diagnostics.Debug.WriteLine("current data:" & current_data)
+                'handle special cases:
+                If (gd_col = 7) Then
+                    skipped_cols += 1
+                    Dim cell_to_style = String.Format("C{0}", current_cell_row)
+                    Try
+                        If Convert.ToInt16(Form1.dgv2.Rows(row_offset).Cells(gd_col).Value.ToString()) = 1 Then
+                            wSheetGemBox.Cells.GetSubrange(cell_to_style).Style.Font.Weight = ExcelFont.BoldWeight
+                        End If
+                    Catch ex As Exception
+                        Logger.LogWarning("[" & methodName & "]" & " Errore nella lettura dei dati: ", ex)
+                    End Try
+
+
+
+                ElseIf (gd_col = 12) Then
+                    skipped_cols += 1
+                    Dim cell_to_style = String.Format("F{0}", current_cell_row)
+                    current_cell.Value = current_data
+                    Try
+                        If Convert.ToInt16(Form1.dgv2.Rows(row_offset).Cells(gd_col).Value.ToString()) = 1 Then
+                            wSheetGemBox.Cells.GetSubrange(cell_to_style).Style.Font.Weight = ExcelFont.BoldWeight
+                        End If
+                    Catch ex As Exception
+                        Logger.LogWarning("[" & methodName & "]" & " Errore nella lettura dei dati: ", ex)
+                    End Try
+
+
+                ElseIf current_data = EMPTY_STRING Then
+                    current_cell.Value = String.Empty
+                Else
+                    current_cell.Value = current_data
+                End If
+
+                gv_col += 1
+
+            End While
+        Next row_offset
+        For current_row = 0 To GV_DAILYREP_ROWS_COUNT - 2
+            Dim rowIndex = current_row + first_row
+            Dim cellToTest = wSheetGemBox.Cells(rowIndex, GetColumnNumber("U"))
+
+            'wSheet.Rows(rowIndex).Height = 600
+            Dim testIsPassed As Boolean = cellToTest.Value <> Nothing AndAlso (cellToTest.Value = 31 Or cellToTest.Value = 32)
+
+            If (testIsPassed) Then
+                For this_col = GetColumnNumber("B") To GetColumnNumber("AI")
+                    wSheetGemBox.Cells(rowIndex, this_col).Style.Font.Weight = ExcelFont.BoldWeight
+                Next this_col
+            End If
+        Next current_row
+
+
+
+        'populating the report
+        Dim report_start_row = 38 + GV_DAILYREP_ROWS_COUNT - 1  'skip header and empty rows
+        Dim report_start_col = 2 'skip the first column
+
+
+        For this_row = report_start_row To report_start_row + Form1.dgv.Rows.Count - 1
+
+            For this_col = report_start_col + 1 To Form1.dgv.Columns.Count - 1
+                Dim current_data = Form1.dgv.Rows(this_row - report_start_row).Cells(this_col - report_start_col)
+                Dim current_cell = wSheetGemBox.Cells(this_row, this_col + 1)
+
+                If current_data.Value.ToString() = EMPTY_STRING Then
+
+                    current_cell.Value = String.Empty
+                Else
+                    current_cell.Value = current_data.Value.ToString()
+
+                End If
+            Next
+        Next
+
+        SetRangeValue(wSheetGemBox, "DATA_QAL2_CO", Form1.section.ToString(), "CO")
+        SetRangeValue(wSheetGemBox, "DATA_QAL2_NO", Form1.section.ToString(), "NOX")
+        SetRangeValue(wSheetGemBox, "DATA_QAL2_O2", Form1.section.ToString(), "O2")
+
+
+
+        SetCoefficientValue(wSheetGemBox, "A_QAL2_CO", Form1.section.ToString(), "COEFF_A")
+        SetCoefficientValue(wSheetGemBox, "A_QAL2_NO", Form1.section.ToString(), "COEFF_A")
+        SetCoefficientValue(wSheetGemBox, "A_QAL2_O2", Form1.section.ToString(), "COEFF_A")
+
+
+
+        SetCoefficientValue(wSheetGemBox, "B_QAL2_CO", Form1.section.ToString(), "COEFF_B")
+        SetCoefficientValue(wSheetGemBox, "B_QAL2_NO", Form1.section.ToString(), "COEFF_B")
+        SetCoefficientValue(wSheetGemBox, "B_QAL2_O2", Form1.section.ToString(), "COEFF_B")
+
+
+        SetRangeValueWithMultiplier(wSheetGemBox, "RANGE_QAL2_CO", Form1.section.ToString(), "Y_MAX", 1.1)
+        SetRangeValueWithMultiplier(wSheetGemBox, "RANGE_QAL2_NO", Form1.section.ToString(), "Y_MAX", 1.1)
+
+        ComboStatus.Report(State.FinishedReport)
+        QAL2.Clear()
+        QAL2.Columns.Clear()
+        Dim reportFileXls = reportTitle & ".xls"
+        Dim reportFilePdf = reportTitle & ".pdf"
+        Dim reportPath = Path.Combine(reportDir, reportFileXls)
+        Dim reportPathPdf = Path.Combine(reportDir, reportFilePdf)
+        wBookGemBox.Save(reportPath)
+        wBookGemBox.Save(reportPathPdf)
+
+        If (startDate = endDate) Then
+            ComboStatus.Report(State.Finished)
+            ShowCompletionDialog()
+        End If
+
+    End Sub
+
+    Sub SetRangeValue(wSheet As ExcelWorksheet, rangeName As String, Sezione As String, suffix As String)
+
+        Dim qal_select = QAL2.Select(String.Format("CHINAM LIKE 'SME{0}_{1}'", Sezione, suffix)).FirstOrDefault()
+
+        If qal_select IsNot Nothing Then
+            Dim result = String.Format("{0:dd/MM/yyyy hh:mm}", qal_select.Item("Data_INI"))
+            wSheet.NamedRanges.Item(rangeName).Range.Value = result
+        Else
+            wSheet.NamedRanges.Item(rangeName).Range.Value = String.Empty
+        End If
+    End Sub
+
+    Sub SetCoefficientValue(wSheet As ExcelWorksheet, rangeName As String, Sezione As String, columnName As String)
+        Dim result = QAL2.Select(String.Format("CHINAM LIKE 'SME{0}_{1}'", Sezione, columnName)).FirstOrDefault()
+
+        If result IsNot Nothing Then
+            wSheet.NamedRanges.Item(rangeName).Range.Value = result.Item(columnName)
+
+        Else
+            wSheet.NamedRanges.Item(rangeName).Range.Value = String.Empty
+        End If
+
+    End Sub
+
+    Sub SetRangeValueWithMultiplier(wSheet As ExcelWorksheet, rangeName As String, Sezione As String, columnName As String, multiplier As Double)
+        Dim result = QAL2.Select(String.Format("CHINAM LIKE 'SME{0}_{1}'", Sezione, columnName)).FirstOrDefault()
+        If result IsNot Nothing Then
+            wSheet.NamedRanges.Item(rangeName).Range.Value = DirectCast(result.Item(columnName), Double) * multiplier
+        Else
+            wSheet.NamedRanges.Item(rangeName).Range.Value = String.Empty
+        End If
+    End Sub
+
+    Private Function GetColumnNumber(columnLetter As String) As Integer
+
+        Dim base As Integer = Asc("A") - 1
+        Dim result As Integer = 0
+
+        For Each c As Char In columnLetter.ToUpper()
+            result = result * 26 + Asc(c) - base
+        Next
+
+        Return result - 1
+
+    End Function
+
     Private Function GetChimneyName(ByVal param As Integer) As String
         Select Case (param)
             Case 1
@@ -894,6 +1325,56 @@ Public Class ImpiantoBrindisi
                 Return "CC3"
         End Select
         Return "CC"
+    End Function
+
+    Function FillQAL2() As Byte
+
+        Dim connection As New SqlConnection(connectionString)
+        Dim command As System.Data.SqlClient.SqlCommand
+        Dim reader As System.Data.SqlClient.SqlDataReader
+        Dim methodName As String = GetCurrentMethod()
+        Dim ret As Byte = 1
+        QAL2.Columns.Add(New Data.DataColumn("Data_INI", GetType(DateTime)))
+        QAL2.Columns.Add(New Data.DataColumn("CHINAM", GetType(String)))
+        QAL2.Columns.Add(New Data.DataColumn("COEFF_A", GetType(Double)))
+        QAL2.Columns.Add(New Data.DataColumn("COEFF_B", GetType(Double)))
+        QAL2.Columns.Add(New Data.DataColumn("Y_MAX", GetType(Double)))
+
+
+        Dim log_statement As String = "SELECT * FROM [Coeff_X_Validita] WHERE DATA_FIN IS NULL"
+
+        connection.Open()
+        Try
+            command = New System.Data.SqlClient.SqlCommand(log_statement, connection)
+        Catch ex As SqlException
+            Logger.LogError("[" & methodName & "]" & " Errore durante l'esecuzione della query: ", ex)
+            ret = 0
+            Return ret
+        End Try
+
+        reader = command.ExecuteReader()
+
+        Dim dr As Data.DataRow = QAL2.NewRow()
+        While reader.Read()
+            Try
+                dr("Data_INI") = reader("Data_INI")
+                dr("CHINAM") = reader("CHINAM")
+                dr("COEFF_A") = reader("COEFF_A")
+                dr("COEFF_B") = reader("COEFF_B")
+                dr("Y_MAX") = reader("Y_MAX")
+                QAL2.Rows.Add(dr)
+                dr = QAL2.NewRow()
+            Catch ex As Exception
+                Logger.LogWarning("[" & methodName & "]" & " Errore nella lettura dei dati: ", ex)
+                Continue While
+            End Try
+            
+        End While
+
+        connection.Close()
+
+        Return ret
+
     End Function
 
     Protected Sub SetRangeValueAndStyle(ByRef range As Object, ByVal value As String, ByVal bold As Boolean)
@@ -973,7 +1454,7 @@ Public Class ImpiantoBrindisi
             colToJ.Add(26, 34)
             colToJ.Add(27, 36)
         End If
-        
+
 
     End Sub
 
