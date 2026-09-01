@@ -68,7 +68,7 @@ Public Class ImpiantoTaranto
         _chimneyList.Add(New Camino("Flussi di massa", 8, 0))
         _chimneyList.Add(New Camino("Bolla di raffineria", 8, 1))
 
-        
+
 
     End Sub
 
@@ -176,7 +176,7 @@ Public Class ImpiantoTaranto
             End Try
 
         End If
-       
+
         While (startDate <= endDate)
             UpdateProgressBarValue(formInstance, 0)
             If (Not formInstance.ProgressBar1.Visible) Then
@@ -2234,7 +2234,7 @@ Public Class ImpiantoTaranto
                 dr("IDX_REPORT") = reader("IDX_REPORT")
                 dr("INS_ORDER") = String.Format("{0:n0}", reader("INS_ORDER"))
                 dr("ORA") = reader("ORA") 'CountString.Format(CultureInfo.CreateSpecificCulture("it-IT"), "{0:n2}", reader("NOX")
-                    If (Not (IsDBNull(reader("O2_RIF")))) Then
+                If (Not (IsDBNull(reader("O2_RIF")))) Then
                     If (Integer.Parse(reader("O2_RIF")) = O2RefDict(cteConfiguration)) Then
                         dr("NOX_IC") = String.Format("{0:n2}", reader("NOX_IC"))
                         dr("NOX_TQ") = String.Format("{0:n2}", reader("NOX_TQ"))
@@ -2280,10 +2280,10 @@ Public Class ImpiantoTaranto
                         dr("PORTATA_COT") = String.Format("{0:n2}", reader("PORTATA_COT"))
                         dr("STATO_SME") = String.Format("{0:n2}", reader("STATO_SME"))
                     End If
-                    End If
+                End If
 
-                    dt.Rows.Add(dr)
-                    dr = dt.NewRow()
+                dt.Rows.Add(dr)
+                dr = dt.NewRow()
 
 
             Catch ex As Exception
@@ -2322,9 +2322,9 @@ Public Class ImpiantoTaranto
                 d2 = New Date(2020, 1, 1)
             Case 1
                 d2 = New Date(2020, mesenh3, 1)
-                reportTitle = "152_MASSICO_MESE_" & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MMMM_yyyy}", Date.Parse(startDate))
+                reportTitle = "152_MASSICO_MESE_" & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:yyyy_MM}", Date.Parse(startDate))
             Case 2
-                reportTitle = "152_MASSICO_GIORNO_" & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:dd_MMMM_yyyy}", Date.Parse(startDate))
+                reportTitle = "152_MASSICO_GIORNO_" & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:yyyy_MM_dd}", Date.Parse(startDate))
                 d2 = New Date(2020, mesenh3, 1)
         End Select
 
@@ -2360,7 +2360,7 @@ Public Class ImpiantoTaranto
                 End If
             Case 1
                 wSheet.Range("NomeTabella").Value = "152 MASSICO MENSILE CAMINI DI RAFFINERIA"
-                wSheet.Range("IntervalloDate").Value = "Report Mensile del Mese di " & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MMMM yyyy}", startDateFormatted)
+                wSheet.Range("IntervalloDate").Value = "Report Mensile del Mese di " & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MM yyyy}", startDateFormatted)
                 wSheet.Range("B8").Value = "Giorno"
                 wSheet.Range("NOTA_FRASE").Value = ""
             Case 2
@@ -2370,7 +2370,7 @@ Public Class ImpiantoTaranto
         End Select
 
         wSheet.Range("NomeTabella").Font.Bold = True
-        wSheet.Range("NomeCentrale").Value = "ENI R&M Taranto " ' " & MySharedMethod.GetChimneyName(Convert.ToInt16(Sezione.Text.ToString()))
+        wSheet.Range("NomeCentrale").Value = "ENI INDUSTRIAL EVOLUTION Taranto " ' " & MySharedMethod.GetChimneyName(Convert.ToInt16(Sezione.Text.ToString()))
         wSheet.Range("NomeCentrale").Font.Bold = True
         wSheet.Range("SisMisura").Value = "Sistema di Monitoraggio delle Emissioni"
         wSheet.Range("SisMisura").Font.Bold = True
@@ -3016,22 +3016,22 @@ Public Class ImpiantoTaranto
 
                 wSheet.Range("NomeTabella").Value = "152 CONCENTRAZIONI MENSILI CAMINI DI RAFFINERIA"
 
-                wSheet.Range("IntervalloDate").Value = "Report Mensile del Mese di " & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MMMM yyyy}", startDateFormatted)
+                wSheet.Range("IntervalloDate").Value = "Report Mensile del Mese di " & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MM yyyy}", startDateFormatted)
                 wSheet.Cells(2, 8).Value = "GIORNO"
-                reportTitle = "152_BOLLA_MESE_" & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MMMM_yyyy}", Date.Parse(startDate))
+                reportTitle = "152_BOLLA_MESE_" & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:yyyy_MM}", Date.Parse(startDate))
 
             Case 2
                 wSheet.Range("NomeTabella").Value = "152 CONCENTRAZIONI GIORNALIERO CAMINI DI RAFFINERIA"
                 wSheet.Range("IntervalloDate").Value = "Report Giornaliero di " + String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:dd/MM/yyyy}", startDateFormatted)
                 wSheet.Cells(2, 8).Value = "ORA"
-                reportTitle = "152_BOLLA_GIORNO" & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:dd_MMMM_yyyy}", Date.Parse(startDate))
+                reportTitle = "152_BOLLA_GIORNO_" & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:yyyy_MM_dd}", Date.Parse(startDate))
 
         End Select
 
 
 
         wSheet.Range("NomeTabella").Font.Bold = True
-        wSheet.Range("NomeCentrale").Value = "ENI R&M Taranto " ' " & MySharedMethod.GetChimneyName(Convert.ToInt16(Sezione.Text.ToString()))
+        wSheet.Range("NomeCentrale").Value = "ENI INDUSTRIAL EVOLUTION Taranto " ' " & MySharedMethod.GetChimneyName(Convert.ToInt16(Sezione.Text.ToString()))
         wSheet.Range("NomeCentrale").Font.Bold = True
         wSheet.Range("SisMisura").Value = "Sistema di Monitoraggio delle Emissioni"
         wSheet.Range("SisMisura").Font.Bold = True
@@ -3301,7 +3301,7 @@ Public Class ImpiantoTaranto
 
         wSheet.Range("NomeTabella").Value = "152_CONC_ANNO"
         wSheet.Range("NomeTabella").Font.Bold = True
-        wSheet.Range("NomeCentrale").Value = "ENI R&M - Raffineria di Taranto - CAMINO " & MySharedMethod.GetChimneyName(Convert.ToInt16(Form1.section.ToString()))
+        wSheet.Range("NomeCentrale").Value = "ENI INDUSTRIAL EVOLUTION Taranto - Emissioni CAMINO " & MySharedMethod.GetChimneyName(Convert.ToInt16(Form1.section.ToString()))
         wSheet.Range("NomeCentrale").Font.Bold = True
         wSheet.Range("SisMisura").Value = "Sistema di Monitoraggio delle Emissioni"
         wSheet.Range("SisMisura").Font.Bold = True
@@ -3540,7 +3540,7 @@ Public Class ImpiantoTaranto
 
         wSheet.Range("NomeTabella").Value = "152_CONC_MESE"
         wSheet.Range("NomeTabella").Font.Bold = True
-        wSheet.Range("NomeCentrale").Value = "ENI R&M - Raffineria di Taranto - CAMINO " & MySharedMethod.GetChimneyName(Form1.section.ToString())
+        wSheet.Range("NomeCentrale").Value = "ENI INDUSTRIAL EVOLUTION Taranto - Emissioni CAMINO " & MySharedMethod.GetChimneyName(Form1.section.ToString())
         wSheet.Range("NomeCentrale").Font.Bold = True
         wSheet.Range("SisMisura").Value = "Sistema di Monitoraggio delle Emissioni"
         wSheet.Range("SisMisura").Font.Bold = True
@@ -3552,14 +3552,14 @@ Public Class ImpiantoTaranto
 
         wSheet.Range("TitoloTabella").Font.Bold = True
         Dim startDateFormatted As DateTime = DateTime.Parse(startDate).Date
-        wSheet.Range("IntervalloDate").Value = "Report Mensile del Mese di " & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MMMM yyyy}", startDateFormatted)
+        wSheet.Range("IntervalloDate").Value = "Report Mensile del Mese di " & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MM yyyy}", startDateFormatted)
         wSheet.Range("IntervalloDate").Font.Bold = True
 
         wSheet.Range("HNF").Value = hnf
         wSheet.Range("HNF").Font.Bold = True
         wSheet.Range("HTRANS").Value = htran
         wSheet.Range("HTRANS").Font.Bold = True
-        reportTitle = MySharedMethod.GetChimneyName(Convert.ToInt16(Form1.section.ToString())) & "_CONC_" & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MMMM_yyyy}", Date.Parse(startDate))
+        reportTitle = MySharedMethod.GetChimneyName(Convert.ToInt16(Form1.section.ToString())) & "_CONC" & "_MESE_" & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MMMM_yyyy}", Date.Parse(startDate))
         If (Form1.section <> 2) Then
             Try
                 wSheet.Range("NOTA_E2").Value = ""
@@ -3750,7 +3750,7 @@ Public Class ImpiantoTaranto
 
         wSheet.Range("NomeTabella").Value = "152_CONC_GIORNO"
         wSheet.Range("NomeTabella").Font.Bold = True
-        wSheet.Range("NomeCentrale").Value = "ENI R&M - Raffineria di Taranto - CAMINO " & MySharedMethod.GetChimneyName(Form1.section.ToString())
+        wSheet.Range("NomeCentrale").Value = "ENI INDUSTRIAL EVOLUTION Taranto - Emissioni CAMINO " & MySharedMethod.GetChimneyName(Form1.section.ToString())
         wSheet.Range("NomeCentrale").Font.Bold = True
         wSheet.Range("SisMisura").Value = "Sistema di Monitoraggio delle Emissioni"
         wSheet.Range("SisMisura").Font.Bold = True
@@ -3762,14 +3762,14 @@ Public Class ImpiantoTaranto
 
         wSheet.Range("TitoloTabella").Font.Bold = True
         Dim startDateFormatted As DateTime = DateTime.Parse(startDate).Date
-        wSheet.Range("IntervalloDate").Value = "Report Giornaliero del " & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:dd/MMMM/yyyy}", startDateFormatted)
+        wSheet.Range("IntervalloDate").Value = "Report Giornaliero del " & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:dd/MM/yyyy}", startDateFormatted)
         wSheet.Range("IntervalloDate").Font.Bold = True
 
         wSheet.Range("HNF").Value = hnf
         wSheet.Range("HNF").Font.Bold = True
         wSheet.Range("HTRANS").Value = htran
         wSheet.Range("HTRANS").Font.Bold = True
-        reportTitle = MySharedMethod.GetChimneyName(Convert.ToInt16(Form1.section.ToString())) & "152_CONC_CAMINO_GIORNO_" & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:dd_MMMM_yyyy}", Date.Parse(startDate))
+        reportTitle = MySharedMethod.GetChimneyName(Convert.ToInt16(Form1.section.ToString())) & "_CONC_GIORNO_" & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:dd_MMMM_yyyy}", Date.Parse(startDate))
         If (Form1.section <> 2) Then
             Try
                 wSheet.Range("NOTA_E2").Value = ""
@@ -3939,7 +3939,7 @@ Public Class ImpiantoTaranto
 
         wSheet.Range("NomeTabella").Value = "152_CONC_ANNO"
         wSheet.Range("NomeTabella").Font.Bold = True
-        wSheet.Range("NomeCentrale").Value = "ENI R&M - Raffineria di Taranto - Camino E3" & Chr(10) & cteConfigurationString
+        wSheet.Range("NomeCentrale").Value = "ENI INDUSTRIAL EVOLUTION Taranto - Emissioni CAMINO E3" & Chr(10) & cteConfigurationString
         wSheet.Range("NomeCentrale").Font.Bold = True
         wSheet.Range("SisMisura").Value = "Sistema di Monitoraggio delle Emissioni"
         wSheet.Range("SisMisura").Font.Bold = True
@@ -3947,7 +3947,7 @@ Public Class ImpiantoTaranto
         wSheet.Range("TitoloTabella").Font.Bold = True
         wSheet.Range("IntervalloDate").Value = "Report Annuale Anno " & Date.Parse(startDate, ci).Year
         wSheet.Range("IntervalloDate").Font.Bold = True
-        reportTitle = "E3_" & "_CONC_ANNO_" & startDate.Year
+        reportTitle = "E3_" & "CONC_ANNO_" & startDate.Year
 
         Dim year As Integer = Date.Parse(startDate, ci).Year
 
@@ -4171,14 +4171,14 @@ Public Class ImpiantoTaranto
         ComboStatus.Report(State.TableLoading)
         wSheet.Range("NomeTabella").Value = "152_CONC_MESE"
         wSheet.Range("NomeTabella").Font.Bold = True
-        wSheet.Range("NomeCentrale").Value = "ENI R&M - Raffineria di Taranto - Camino E3" & Chr(10) & cteConfigurationString
+        wSheet.Range("NomeCentrale").Value = "ENI INDUSTRIAL EVOLUTION Taranto - Emissioni CAMINO E3" & Chr(10) & cteConfigurationString
         wSheet.Range("NomeCentrale").Font.Bold = True
         wSheet.Range("SisMisura").Value = "Sistema di Monitoraggio delle Emissioni"
         wSheet.Range("SisMisura").Font.Bold = True
         wSheet.Range("TitoloTabella").Value = "Report Mensile concentrazioni medie  giornaliere (NOX, CO, SO2, POLVERI, COT) " & percent
         wSheet.Range("TitoloTabella").Font.Bold = True
         Dim startDateFormatted As DateTime = DateTime.Parse(startDate).Date
-        wSheet.Range("IntervalloDate").Value = "Report Mensile del Mese di " & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MMMM yyyy}", startDateFormatted)
+        wSheet.Range("IntervalloDate").Value = "Report Mensile del Mese di " & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MM yyyy}", startDateFormatted)
         wSheet.Range("IntervalloDate").Font.Bold = True
         reportTitle = "E3_" & "CONC_MESE_" & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:MMMM_yyyy}", Date.Parse(startDate))
         wSheet.Range("HNF").Value = hnf
@@ -4468,16 +4468,16 @@ Public Class ImpiantoTaranto
         ComboStatus.Report(State.TableLoading)
         wSheet.Range("NomeTabella").Value = "152_CONC_GIORNO"
         wSheet.Range("NomeTabella").Font.Bold = True
-        wSheet.Range("NomeCentrale").Value = "ENI R&M - Raffineria di Taranto - Camino E3" & Chr(10) & cteConfigurationString
+        wSheet.Range("NomeCentrale").Value = "ENI INDUSTRIAL EVOLUTION Taranto - Emissioni CAMINO E3" & Chr(10) & cteConfigurationString
         wSheet.Range("NomeCentrale").Font.Bold = True
         wSheet.Range("SisMisura").Value = "Sistema di Monitoraggio delle Emissioni"
         wSheet.Range("SisMisura").Font.Bold = True
         wSheet.Range("TitoloTabella").Value = "Report Giornaliero concentrazioni medie  giornaliere (NOX, CO, SO2, POLVERI, COT) " & percent
         wSheet.Range("TitoloTabella").Font.Bold = True
         Dim startDateFormatted As DateTime = DateTime.Parse(startDate).Date
-        wSheet.Range("IntervalloDate").Value = "Report Giornaliero del " & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:dd/MMMM/yyyy}", startDateFormatted)
+        wSheet.Range("IntervalloDate").Value = "Report Giornaliero del " & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:dd/MM/yyyy}", startDateFormatted)
         wSheet.Range("IntervalloDate").Font.Bold = True
-        reportTitle = "E3_" & "CONC_GIORNO_TARANTOCTE_" & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:dd_MMMM_yyyy}", Date.Parse(startDate))
+        reportTitle = "E3_" & "CONC_GIORNO_" & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:dd_MMMM_yyyy}", Date.Parse(startDate))
         wSheet.Range("HNF").Value = hnf
         wSheet.Range("HNF").Font.Bold = True
         wSheet.Range("HTRANS").Value = htran
