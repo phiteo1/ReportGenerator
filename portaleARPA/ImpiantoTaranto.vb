@@ -1151,7 +1151,7 @@ Public Class ImpiantoTaranto
         testCMD.Parameters("@totvleggso2").Direction = Data.ParameterDirection.Output
         testCMD.Parameters.Add("@totvleggpolveri", Data.SqlDbType.Int)
         testCMD.Parameters("@totvleggpolveri").Direction = Data.ParameterDirection.Output
-
+        testCMD.CommandTimeout = 300
         Try
             testCMD.ExecuteScalar()
         Catch ex As Exception
@@ -1176,7 +1176,7 @@ Public Class ImpiantoTaranto
 
         Dim log_statement As String = "SELECT * FROM [ARPA_WEB_REAL_TIME] WHERE IDX_REPORT = " & retLong.ToString() & dataType
         command = New System.Data.SqlClient.SqlCommand(log_statement, connection)
-
+        command.CommandTimeout = 300
         Try
             reader = command.ExecuteReader()
         Catch ex As SqlException
