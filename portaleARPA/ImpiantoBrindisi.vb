@@ -921,7 +921,7 @@ Public Class ImpiantoBrindisi
         SetRangeBorderStyle(wSheetGemBox.Cells.GetSubrange("G5:R5"))
         SetRangeValueAndStyle(wSheetGemBox.NamedRanges.Item("HNF").Range, hnf, True)
         SetRangeValueAndStyle(wSheetGemBox.NamedRanges.Item("HTRANS").Range, htran, True)
-        reportTitle = "152_CONC_MESECC_" & Form1.section.ToString()
+        reportTitle = "152_CONC_MESECC_" & Form1.section.ToString() & "_" & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:yyyy_MM}", startDateFormatted)
 
         Dim i As Integer
         Dim j As Integer
@@ -1125,7 +1125,7 @@ Public Class ImpiantoBrindisi
         SetRangeBorderStyle(wSheetGemBox.Cells.GetSubrange("F1:P5"))
         SetRangeValueAndStyle(wSheetGemBox.NamedRanges.Item("HNF").Range, hnf, True)
         SetRangeValueAndStyle(wSheetGemBox.NamedRanges.Item("HTRANS").Range, htran, True)
-        reportTitle = "152_CONC_GIORNOCC_" & Form1.section.ToString()
+        reportTitle = "152_CONC_GIORNOCC_" & Form1.section.ToString() & "_" & String.Format(New System.Globalization.CultureInfo("it-IT"), "{0:yyyy_MM_dd}", startDateFormatted)
         Dim GV_DAILYREP_ROWS_COUNT = Form1.dgv2.Rows.Count
 
         Dim howmanyrows = If(GV_DAILYREP_ROWS_COUNT - 2 >= 0, GV_DAILYREP_ROWS_COUNT - 2, 0)

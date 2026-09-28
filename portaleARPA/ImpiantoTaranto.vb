@@ -178,6 +178,7 @@ Public Class ImpiantoTaranto
         End If
 
         While (startDate <= endDate)
+            hiddenColumns.Clear()
             UpdateProgressBarValue(formInstance, 0)
             If (Not formInstance.ProgressBar1.Visible) Then
                 UpdateProgressBarStatus(formInstance, True)
@@ -185,11 +186,11 @@ Public Class ImpiantoTaranto
             If Form1.section = 8 Then
                 If Form1.bolla = 0 Then
                     dataTable1 = GetDataFlussi(barProgress, startDate, endDate, Form1.section, Form1.reportType, 1)                                                                            'Get the data from the database and assign to first data table structure. The function is runned in an other trhead in order to allow the GUI to refresh properly
-                    dataTable2 = GetDataFlussi(barProgress, startDate, Form1.endDate, Form1.section, Form1.reportType, 2)                                                                           'Get the data from the database and assign to second data table structure
+                    dataTable2 = GetDataFlussi(barProgress, startDate, endDate, Form1.section, Form1.reportType, 2)                                                                           'Get the data from the database and assign to second data table structure
                     preRenderFirstTable(Form1.section)
                 ElseIf Form1.bolla = 1 Then
-                    dataTable1 = GetFirstBollaTable(barProgress, Form1.startDate, Form1.endDate, Form1.section, Form1.reportType)                                                                          'Get the data from the database and assign to first data table structure. The function is runned in an other trhead in order to allow the GUI to refresh properly
-                    dataTable2 = GetSecondBollaTable(barProgress, Form1.startDate, Form1.endDate, Form1.section, Form1.reportType)                                                                        'Get the data from the database and assign to second data table structure
+                    dataTable1 = GetFirstBollaTable(barProgress, startDate, endDate, Form1.section, Form1.reportType)                                                                          'Get the data from the database and assign to first data table structure. The function is runned in an other trhead in order to allow the GUI to refresh properly
+                    dataTable2 = GetSecondBollaTable(barProgress, startDate, endDate, Form1.section, Form1.reportType)                                                                        'Get the data from the database and assign to second data table structure
                 Else
                     MessageBox.Show("Errore nella scelta della configurazione del camino.", "Avviso", MessageBoxButtons.OK, MessageBoxIcon.Warning)
                     EnableFormSafe(formInstance)
@@ -3502,7 +3503,7 @@ Public Class ImpiantoTaranto
 
 
 
-        If Form1.section = 6 And Form1.aia = 1 And Form1.startDate >= d2 Then
+        If Form1.section = 6 And Form1.aia = 1 And startDate >= d2 Then
             templateName = "E9_152_CONC_MESE_TARANTO_RAFF_COV.xls"
         ElseIf Form1.section = 7 Then
             templateName = "152_CONC_MESE_TARANTO_RAFF_COV_NO_GIC.xls"
@@ -3720,7 +3721,7 @@ Public Class ImpiantoTaranto
 
 
 
-        If Form1.section = 6 And Form1.startDate >= d2 Then
+        If Form1.section = 6 And startDate >= d2 Then
             templateName = "E9_152_CONC_GIORNO_TARANTO_COV.xls"
         Else
             templateName = "152_CONC_GIORNO_TARANTO_COV.xls"

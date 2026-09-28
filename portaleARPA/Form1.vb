@@ -81,13 +81,8 @@ Public Class Form1
             endDate = New DateTime(DateTimePicker2.Value.Year, DateTimePicker2.Value.Month, DateTimePicker2.Value.Day)
         End If
 
-        If Not CheckBox1.Checked Then
-            aia = 0
-        End If
-
-        If ComboBox3.Visible Then
-            isCte = True
-        End If
+        aia = If(CheckBox1.Checked, 1, 0)
+        isCte = ComboBox3.Visible
 
         section = (concretePlant.getChimneyFromName(ComboBox1.SelectedItem)).getSection()
         bolla = (concretePlant.getChimneyFromName(ComboBox1.SelectedItem)).getBolla()
